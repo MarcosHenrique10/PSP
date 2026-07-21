@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choice Games & Hosted Games Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* ChoiceScript Original Parchment Theme Colors */
+      --bg: #f4f1ea;
+      --fg: #222222;
+      --muted: #666666;
+      --accent: #7a5c3e;
+      --card-bg: #fbf9f3;
+      --card-hover: #ffffff;
+      --border: #dfdcd3;
+      --border-hover: #b8b2a5;
+      
+      --choice-blue: #2f5d78;
+      --choice-bg: #eef4f8;
+      --chosen-green: #3d6b3d;
+      --chosen-bg: #eef5ec;
+
+      --cog-color: #2f5d78;
+      --cog-bg: #eef4f8;
+      --cog-border: #b3cde0;
+
+      --hg-color: #8b0000;
+      --hg-bg: #fef2f2;
+      --hg-border: #fca5a5;
+
+      --paper-line-color: rgba(34, 30, 25, 0.04);
+      --paper-texture: repeating-linear-gradient(
+        0deg,
+        var(--paper-line-color) 0,
+        var(--paper-line-color) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --shadow-sm: 0 2px 5px rgba(0,0,0,0.04), 0 1px 2px rgba(122, 92, 62, 0.05);
+      --shadow-md: 0 8px 20px rgba(122, 92, 62, 0.08), 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    body.dark-mode {
+      --bg: #1a1714;
+      --fg: #e6e1d7;
+      --muted: #a0988c;
+      --accent: #d4a373;
+      --card-bg: #24201c;
+      --card-hover: #2d2924;
+      --border: #38322c;
+      --border-hover: #544b42;
+
+      --cog-color: #7dd3fc;
+      --cog-bg: #0c2a3a;
+      --cog-border: #1e405b;
+
+      --hg-color: #fca5a5;
+      --hg-bg: #3b1212;
+      --hg-border: #5c1d1d;
+
+      --paper-line-color: rgba(255, 255, 255, 0.02);
+      --shadow-sm: 0 2px 5px rgba(0,0,0,0.3);
+      --shadow-md: 0 8px 20px rgba(0,0,0,0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg);
+      background-image: var(--paper-texture);
+      background-attachment: scroll;
+      color: var(--fg);
+      min-height: 100vh;
+      line-height: 1.6;
+      padding-bottom: 60px;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    header {
+      padding: 36px 24px 20px 24px;
+      max-width: 1240px;
+      margin: 0 auto;
+      border-bottom: 2px solid var(--accent);
+      margin-bottom: 24px;
+    }
+
+    .header-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .title-area h1 {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--fg);
+      letter-spacing: -0.01em;
+      margin-bottom: 6px;
+    }
+
+    .title-area p {
+      color: var(--accent);
+      font-size: 0.98rem;
+      font-weight: 500;
+      font-style: italic;
+    }
+
+    .stats-container {
+      display: flex;
+      gap: 12px;
+    }
+
+    .stat-badge {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      padding: 10px 18px;
+      border-radius: var(--radius-md);
+      text-align: center;
+      min-width: 105px;
+    }
+
+    .stat-number {
+      font-family: 'Merriweather', serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 3px;
+      font-weight: 600;
+    }
+
+    /* Controls Bar */
+    .controls-wrapper {
+      max-width: 1240px;
+      margin: 0 auto 28px auto;
+      padding: 0 24px;
+    }
+
+    .controls-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .search-filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 260px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 11px 40px 11px 40px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      color: var(--fg);
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-box input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(122, 92, 62, 0.15);
+    }
+
+    .search-box .search-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .search-box .clear-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      display: none;
+      padding: 4px;
+    }
+
+    .search-box input:not(:placeholder-shown) + .search-icon + .clear-btn {
+      display: block;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      padding: 8px 15px;
+      border-radius: var(--radius-md);
+      font-size: 0.86rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .filter-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .filter-btn.active.cog {
+      background: var(--cog-color);
+      color: #ffffff;
+      border-color: var(--cog-color);
+    }
+
+    .filter-btn.active.hg {
+      background: var(--hg-color);
+      color: #ffffff;
+      border-color: var(--hg-color);
+    }
+
+    .action-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      font-size: 0.86rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .action-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .action-btn.surprise {
+      background: var(--chosen-green);
+      color: #ffffff;
+      border-color: var(--chosen-green);
+      font-weight: 600;
+    }
+    .action-btn.surprise:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    /* Alphabet bar */
+    .alpha-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      justify-content: center;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .alpha-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 7px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .alpha-btn:hover {
+      color: var(--accent);
+      background: rgba(122, 92, 62, 0.08);
+    }
+
+    .alpha-btn.active {
+      color: var(--accent);
+      background: rgba(122, 92, 62, 0.15);
+      font-weight: 700;
+    }
+
+    /* Grid & View Modes */
+    main {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .grid-view {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
+      gap: 18px;
+    }
+
+    .list-view {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Card Styling */
+    .game-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.2s ease;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .game-card:hover {
+      background: var(--card-hover);
+      border-color: var(--border-hover);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .badge.COG {
+      background: var(--cog-bg);
+      color: var(--cog-color);
+      border: 1px solid var(--cog-border);
+    }
+
+    .badge.HG {
+      background: var(--hg-bg);
+      color: var(--hg-color);
+      border: 1px solid var(--hg-border);
+    }
+
+    .fav-star {
+      background: none;
+      border: none;
+      color: var(--border-hover);
+      font-size: 1.15rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      padding: 0 2px;
+    }
+
+    .fav-star:hover, .fav-star.active {
+      color: #d97706;
+      transform: scale(1.15);
+    }
+
+    .card-title {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: var(--fg);
+      line-height: 1.4;
+      margin-bottom: 10px;
+      word-break: break-word;
+    }
+
+    .card-folder {
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 14px;
+      font-family: monospace;
+      background: var(--bg);
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border);
+      font-size: 0.85rem;
+    }
+
+    .play-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--choice-blue);
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+
+    body.dark-mode .play-link {
+      color: #7dd3fc;
+    }
+
+    .game-card:hover .play-link {
+      text-decoration: underline;
+    }
+
+    /* List view modifications */
+    .list-view .game-card {
+      flex-direction: row;
+      align-items: center;
+      padding: 12px 18px;
+    }
+
+    .list-view .card-top {
+      margin-bottom: 0;
+      order: 1;
+    }
+
+    .list-view .card-body {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+      margin: 0 16px;
+    }
+
+    .list-view .card-title {
+      margin-bottom: 0;
+      font-size: 0.98rem;
+    }
+
+    .list-view .card-folder {
+      margin-bottom: 0;
+    }
+
+    .list-view .card-footer {
+      border: none;
+      padding: 0;
+      order: 3;
+    }
+
+    /* Empty state */
+    .no-results {
+      text-align: center;
+      padding: 50px 20px;
+      background: var(--card-bg);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-lg);
+      grid-column: 1 / -1;
+    }
+
+    .no-results h3 {
+      font-family: 'Merriweather', serif;
+      font-size: 1.25rem;
+      margin-bottom: 8px;
+      color: var(--fg);
+    }
+
+    .no-results p {
+      color: var(--muted);
+    }
+
+    /* Floating Back to top */
+    .back-to-top {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+      box-shadow: var(--shadow-md);
+      z-index: 100;
+    }
+
+    .back-to-top.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .back-to-top:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    @media (max-width: 768px) {
+      header { padding: 24px 16px 16px 16px; }
+      .controls-wrapper { padding: 0 16px; }
+      main { padding: 0 16px; }
+      .header-top { flex-direction: column; align-items: flex-start; }
+      .stats-container { width: 100%; justify-content: space-between; }
+      .stat-badge { flex: 1; min-width: 0; }
+      .list-view .game-card { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .list-view .card-body { margin: 0; flex-direction: column; align-items: flex-start; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-top">
+      <div class="title-area">
+        <h1>Choice Games Library</h1>
+        <p>Koleksi Interaktif Choice of Games & Hosted Games</p>
+      </div>
+      <div class="stats-container">
+        <div class="stat-badge">
+          <div class="stat-number" id="stat-total">434</div>
+          <div class="stat-label">Total Game</div>
+        </div>
+        <div class="stat-badge">
+          <div class="stat-number" style="color: var(--cog-color);" id="stat-cog">182</div>
+          <div class="stat-label">COG</div>
+        </div>
+        <div class="stat-badge">
+          <div class="stat-number" style="color: var(--hg-color);" id="stat-hg">252</div>
+          <div class="stat-label">HG</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="controls-wrapper">
+    <div class="controls-card">
+      <div class="search-filter-row">
+        <div class="search-box">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="search-input" placeholder="Cari judul game atau folder..." autocomplete="off">
+          <button class="clear-btn" id="clear-search" title="Bersihkan">✕</button>
+        </div>
+
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="ALL">Semua (434)</button>
+          <button class="filter-btn cog" data-filter="COG">COG (182)</button>
+          <button class="filter-btn hg" data-filter="HG">HG (252)</button>
+          <button class="filter-btn" data-filter="FAV">Favorit ★</button>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button class="action-btn" id="theme-toggle-btn" title="Ubah Tema Warna">
+            📜 Kertas
+          </button>
+          <button class="action-btn surprise" id="surprise-btn" title="Mainkan game acak!">
+            🎲 Acak
+          </button>
+          <button class="action-btn" id="view-toggle-btn" title="Ubah Tampilan">
+            <span id="view-icon">☰</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="alpha-bar" id="alpha-bar">
+        <!-- Generated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <div class="grid-view" id="games-container">
+      <!-- Cards rendered here -->
+    </div>
+  </main>
+
+  <button class="back-to-top" id="back-to-top" title="Kembali ke atas">
+    ↑
+  </button>
+
+  <script>
+    const GAMES_DATA = [{"category": "COG", "folder": "Broadsides", "title": "Choice of Broadsides", "path": "COG/Broadsides/index.html"}, {"category": "COG", "folder": "Dragon", "title": "Choice of the Dragon", "path": "COG/Dragon/index.html"}, {"category": "COG", "folder": "Vampire", "title": "Choice of the Vampire", "path": "COG/Vampire/index.html"}, {"category": "COG", "folder": "aegisproject180files", "title": "180 Files: The Aegis Project", "path": "COG/aegisproject180files/index.html"}, {"category": "COG", "folder": "alexandria", "title": "Choice of Alexandria", "path": "COG/alexandria/index.html"}, {"category": "COG", "folder": "asteroidrun", "title": "Asteroid Run: No Questions Asked", "path": "COG/asteroidrun/index.html"}, {"category": "COG", "folder": "atlantisacademy", "title": "Atlantis Academy", "path": "COG/atlantisacademy/index.html"}, {"category": "COG", "folder": "avatarofthewolf", "title": "Avatar of the Wolf", "path": "COG/avatarofthewolf/index.html"}, {"category": "COG", "folder": "baroque", "title": "The Mysteries of Baroque", "path": "COG/baroque/index.html"}, {"category": "COG", "folder": "battlemage", "title": "Battlemage: Magic by Mail", "path": "COG/battlemage/index.html"}, {"category": "COG", "folder": "beastofglenkildove", "title": "Hunter: The Reckoning - The Beast of Glenkildove", "path": "COG/beastofglenkildove/index.html"}, {"category": "COG", "folder": "blackcat", "title": "Thieves' Gambit: The Curse of the Black Cat", "path": "COG/blackcat/index.html"}, {"category": "COG", "folder": "blackstoneacademy", "title": "Blackstone Academy for the Magical Arts", "path": "COG/blackstoneacademy/index.html"}, {"category": "COG", "folder": "bloodmoney", "title": "Blood Money", "path": "COG/bloodmoney/index.html"}, {"category": "COG", "folder": "bootlegger", "title": "Bootlegger: Moonshine Empire", "path": "COG/bootlegger/index.html"}, {"category": "COG", "folder": "breadmustrise", "title": "The Bread Must Rise", "path": "COG/breadmustrise/index.html"}, {"category": "COG", "folder": "broadway", "title": "Broadway: 1849", "path": "COG/broadway/index.html"}, {"category": "COG", "folder": "cakesandale", "title": "Cakes and Ale", "path": "COG/cakesandale/index.html"}, {"category": "COG", "folder": "cannonfireconcerto", "title": "Cannonfire Concerto", "path": "COG/cannonfireconcerto/index.html"}, {"category": "COG", "folder": "cat", "title": "Choice of the Cat", "path": "COG/cat/index.html"}, {"category": "COG", "folder": "championofthegods", "title": "Champion of the Gods", "path": "COG/championofthegods/index.html"}, {"category": "COG", "folder": "cheerleader", "title": "Cheerleader's Choice: New York Spirit", "path": "COG/cheerleader/index.html"}, {"category": "COG", "folder": "chronicon", "title": "Chronicon Apocalyptica", "path": "COG/chronicon/index.html"}, {"category": "COG", "folder": "cityoftheclouds", "title": "To the City of the Clouds", "path": "COG/cityoftheclouds/index.html"}, {"category": "COG", "folder": "citysthirst", "title": "Deathless: The City's Thirst", "path": "COG/citysthirst/index.html"}, {"category": "COG", "folder": "cliffhanger", "title": "Cliffhanger: Challenger of Tomorrow", "path": "COG/cliffhanger/index.html"}, {"category": "COG", "folder": "congresswolf", "title": "Congresswolf", "path": "COG/congresswolf/index.html"}, {"category": "COG", "folder": "creatures", "title": "Creatures Such as We", "path": "COG/creatures/index.html"}, {"category": "COG", "folder": "cremedlc", "title": "Crème de la Crème", "path": "COG/cremedlc/index.html"}, {"category": "COG", "folder": "crownofsorceryandsteel", "title": "A Crown of Sorcery and Steel", "path": "COG/crownofsorceryandsteel/index.html"}, {"category": "COG", "folder": "cryptkeepers", "title": "The Cryptkeepers of Hallowford", "path": "COG/cryptkeepers/index.html"}, {"category": "COG", "folder": "daringmermaidexpedition", "title": "The Daring Mermaid Expedition", "path": "COG/daringmermaidexpedition/index.html"}, {"category": "COG", "folder": "deathcollector", "title": "Death Collector", "path": "COG/deathcollector/index.html"}, {"category": "COG", "folder": "deathless", "title": "Choice of the Deathless", "path": "COG/deathless/index.html"}, {"category": "COG", "folder": "demonmark", "title": "Demon Mark: A Russian Saga", "path": "COG/demonmark/index.html"}, {"category": "COG", "folder": "diabolical", "title": "Diabolical", "path": "COG/diabolical/index.html"}, {"category": "COG", "folder": "diabolique", "title": "Révolution Diabolique", "path": "COG/diabolique/index.html"}, {"category": "COG", "folder": "dinoknights", "title": "DinoKnights", "path": "COG/dinoknights/index.html"}, {"category": "COG", "folder": "dragonanddjinn", "title": "The Dragon and the Djinn", "path": "COG/dragonanddjinn/index.html"}, {"category": "COG", "folder": "dragstar", "title": "Drag Star!", "path": "COG/dragstar/index.html"}, {"category": "COG", "folder": "eaglesheir", "title": "The Eagle's Heir", "path": "COG/eaglesheir/index.html"}, {"category": "COG", "folder": "eerie", "title": "For Rent: Haunted House", "path": "COG/eerie/index.html"}, {"category": "COG", "folder": "elitestatus", "title": "Elite Status: Platinum Concierge", "path": "COG/elitestatus/index.html"}, {"category": "COG", "folder": "empyrean", "title": "Empyrean", "path": "COG/empyrean/index.html"}, {"category": "COG", "folder": "escapefromdeath", "title": "Escape from Death", "path": "COG/escapefromdeath/index.html"}, {"category": "COG", "folder": "exileofthegods", "title": "Exile of the Gods", "path": "COG/exileofthegods/index.html"}, {"category": "COG", "folder": "faeriesbargain", "title": "Faerie's Bargain: The Price of Business", "path": "COG/faeriesbargain/index.html"}, {"category": "COG", "folder": "fateofthestormgods", "title": "Fate of the Storm Gods", "path": "COG/fateofthestormgods/index.html"}, {"category": "COG", "folder": "fielderschoice", "title": "The Fielder's Choice", "path": "COG/fielderschoice/index.html"}, {"category": "COG", "folder": "fleet", "title": "The Fleet", "path": "COG/fleet/index.html"}, {"category": "COG", "folder": "fogknows", "title": "The Fog Knows Your Name", "path": "COG/fogknows/index.html"}, {"category": "COG", "folder": "fogofwar", "title": "Fog of War: The Battle for Cerberus", "path": "COG/fogofwar/index.html"}, {"category": "COG", "folder": "fool", "title": "Fool!", "path": "COG/fool/index.html"}, {"category": "COG", "folder": "foraker", "title": "HMS Foraker", "path": "COG/foraker/index.html"}, {"category": "COG", "folder": "foxspirit", "title": "Fox Spirit: A Two-Tailed Adventure", "path": "COG/foxspirit/index.html"}, {"category": "COG", "folder": "gafv2", "title": "Grand Academy II: Attack of the Sequel", "path": "COG/gafv2/index.html"}, {"category": "COG", "folder": "gamesofthemonarchseye", "title": "Games of the Monarch's Eye", "path": "COG/gamesofthemonarchseye/index.html"}, {"category": "COG", "folder": "ghostandgolem", "title": "The Ghost and the Golem", "path": "COG/ghostandgolem/index.html"}, {"category": "COG", "folder": "gildedrails", "title": "Gilded Rails", "path": "COG/gildedrails/index.html"}, {"category": "COG", "folder": "grandacademyforvillains", "title": "Grand Academy for Future Villains", "path": "COG/grandacademyforvillains/index.html"}, {"category": "COG", "folder": "heartofthehouse", "title": "Heart of the House", "path": "COG/heartofthehouse/index.html"}, {"category": "COG", "folder": "heavensrevolution", "title": "Heavens' Revolution: A Lion Among the Cypress", "path": "COG/heavensrevolution/index.html"}, {"category": "COG", "folder": "heroesofmyth", "title": "Heroes of Myth", "path": "COG/heroesofmyth/index.html"}, {"category": "COG", "folder": "heroesoftomorrow", "title": "Heroes of Tomorrow: Hidden Potential", "path": "COG/heroesoftomorrow/index.html"}, {"category": "COG", "folder": "heroesrise", "title": "Heroes Rise: The Prodigy", "path": "COG/heroesrise/index.html"}, {"category": "COG", "folder": "herofall", "title": "Heroes Rise: HeroFall", "path": "COG/herofall/index.html"}, {"category": "COG", "folder": "heroproject", "title": "Heroes Rise: The Hero Project", "path": "COG/heroproject/index.html"}, {"category": "COG", "folder": "herounmasked", "title": "The Hero Unmasked!", "path": "COG/herounmasked/index.html"}, {"category": "COG", "folder": "hollywoodvisionary", "title": "Hollywood Visionary", "path": "COG/hollywoodvisionary/index.html"}, {"category": "COG", "folder": "honorbound", "title": "Honor Bound", "path": "COG/honorbound/index.html"}, {"category": "COG", "folder": "houseofthegoldenmask", "title": "House of the Golden Mask", "path": "COG/houseofthegoldenmask/index.html"}, {"category": "COG", "folder": "hungrynames", "title": "Werewolf: The Apocalypse - The Book of Hungry Names", "path": "COG/hungrynames/index.html"}, {"category": "COG", "folder": "icyborg", "title": "I, Cyborg", "path": "COG/icyborg/index.html"}, {"category": "COG", "folder": "impandimpostor", "title": "An Imp & An Impostor", "path": "COG/impandimpostor/index.html"}, {"category": "COG", "folder": "ironheart", "title": "Ironheart", "path": "COG/ironheart/index.html"}, {"category": "COG", "folder": "kendrickstone", "title": "The Hero of Kendrickstone", "path": "COG/kendrickstone/index.html"}, {"category": "COG", "folder": "kidnapped", "title": "Kidnapped! A Royal Birthday", "path": "COG/kidnapped/index.html"}, {"category": "COG", "folder": "killingtime", "title": "It's Killing Time", "path": "COG/killingtime/index.html"}, {"category": "COG", "folder": "kungfu", "title": "Choice of Kung Fu", "path": "COG/kungfu/index.html"}, {"category": "COG", "folder": "lastmonstermaster", "title": "The Last Monster Master", "path": "COG/lastmonstermaster/index.html"}, {"category": "COG", "folder": "lastscion", "title": "The Last Scion", "path": "COG/lastscion/index.html"}, {"category": "COG", "folder": "liesunderice", "title": "Lies Under Ice", "path": "COG/liesunderice/index.html"}, {"category": "COG", "folder": "lightyearsapart", "title": "Light Years Apart", "path": "COG/lightyearsapart/index.html"}, {"category": "COG", "folder": "luminousunderground", "title": "The Luminous Underground", "path": "COG/luminousunderground/index.html"}, {"category": "COG", "folder": "magehunter", "title": "Magehunter: Phoenix Flame", "path": "COG/magehunter/index.html"}, {"category": "COG", "folder": "magiciansworkshop", "title": "The Magician's Workshop", "path": "COG/magiciansworkshop/index.html"}, {"category": "COG", "folder": "magics", "title": "Choice of Magics", "path": "COG/magics/index.html"}, {"category": "COG", "folder": "martianjob", "title": "The Martian Job", "path": "COG/martianjob/index.html"}, {"category": "COG", "folder": "mask", "title": "Mask of the Plague Doctor", "path": "COG/mask/index.html"}, {"category": "COG", "folder": "mechaace", "title": "Mecha Ace: Heroes of the Vedrian War", "path": "COG/mechaace/index.html"}, {"category": "COG", "folder": "metahuman", "title": "MetaHuman Inc.", "path": "COG/metahuman/index.html"}, {"category": "COG", "folder": "midsummer", "title": "A Midsummer Night's Choice, or Frolic in the Forest", "path": "COG/midsummer/index.html"}, {"category": "COG", "folder": "moreytown", "title": "Welcome to Moreytown", "path": "COG/moreytown/index.html"}, {"category": "COG", "folder": "mrsclaus", "title": "In the Service of Mrs. Claus", "path": "COG/mrsclaus/index.html"}, {"category": "COG", "folder": "neighbourhoodnecromancer", "title": "Neighbourhood Necromancer", "path": "COG/neighbourhoodnecromancer/index.html"}, {"category": "COG", "folder": "newwitchintown", "title": "New Witch in Town", "path": "COG/newwitchintown/index.html"}, {"category": "COG", "folder": "nightroad", "title": "Vampire: The Masquerade - Night Road", "path": "COG/nightroad/index.html"}, {"category": "COG", "folder": "ninja", "title": "Choice of the Ninja", "path": "COG/ninja/index.html"}, {"category": "COG", "folder": "noblesseoblige", "title": "Noblesse Oblige", "path": "COG/noblesseoblige/index.html"}, {"category": "COG", "folder": "nolaisburning", "title": "NOLA Is Burning", "path": "COG/nolaisburning/index.html"}, {"category": "COG", "folder": "odysseyeow", "title": "An Odyssey: Echoes of War", "path": "COG/odysseyeow/index.html"}, {"category": "COG", "folder": "ontherun", "title": "On the Run: Rogue Heroes", "path": "COG/ontherun/index.html"}, {"category": "COG", "folder": "openseason", "title": "The Hero Project: Open Season", "path": "COG/openseason/index.html"}, {"category": "COG", "folder": "orpheusruse", "title": "The ORPHEUS Ruse", "path": "COG/orpheusruse/index.html"}, {"category": "COG", "folder": "outforblood", "title": "Vampire: The Masquerade - Out for Blood", "path": "COG/outforblood/index.html"}, {"category": "COG", "folder": "paranormalprep", "title": "Paranormal Preparatory School", "path": "COG/paranormalprep/index.html"}, {"category": "COG", "folder": "parliamentofknives", "title": "Parliament of Knives", "path": "COG/parliamentofknives/index.html"}, {"category": "COG", "folder": "pendragon", "title": "Pendragon Rising", "path": "COG/pendragon/index.html"}, {"category": "COG", "folder": "petalthrone", "title": "Choice of the Petal Throne", "path": "COG/petalthrone/index.html"}, {"category": "COG", "folder": "pirate", "title": "Choice of the Pirate", "path": "COG/pirate/index.html"}, {"category": "COG", "folder": "playsthething", "title": "The Play's the Thing", "path": "COG/playsthething/index.html"}, {"category": "COG", "folder": "ponpara", "title": "The Great Southern Labyrinth", "path": "COG/ponpara/index.html"}, {"category": "COG", "folder": "ponpara2", "title": "Pon Para and the Unconquerable Scorpion", "path": "COG/ponpara2/index.html"}, {"category": "COG", "folder": "posthuman", "title": "Posthuman: Guardians vs PSION", "path": "COG/posthuman/index.html"}, {"category": "COG", "folder": "professormagicalstudies", "title": "Professor of Magical Studies", "path": "COG/professormagicalstudies/index.html"}, {"category": "COG", "folder": "psyhigh", "title": "Psy High", "path": "COG/psyhigh/index.html"}, {"category": "COG", "folder": "psyhigh2", "title": "Psy High 2: High Summer", "path": "COG/psyhigh2/index.html"}, {"category": "COG", "folder": "pugmire", "title": "Pugmire: Treasure of the Sea Dogs", "path": "COG/pugmire/index.html"}, {"category": "COG", "folder": "ratingswar", "title": "Ratings War", "path": "COG/ratingswar/index.html"}, {"category": "COG", "folder": "rebels", "title": "Choice of Rebels: Uprising", "path": "COG/rebels/index.html"}, {"category": "COG", "folder": "reckless", "title": "Reckless Space Pirates", "path": "COG/reckless/index.html"}, {"category": "COG", "folder": "redemptionseason", "title": "The Hero Project: Redemption Season", "path": "COG/redemptionseason/index.html"}, {"category": "COG", "folder": "rentavice", "title": "Rent-a-Vice", "path": "COG/rentavice/index.html"}, {"category": "COG", "folder": "restorereflectretry", "title": "Restore, Reflect, Retry", "path": "COG/restorereflectretry/index.html"}, {"category": "COG", "folder": "roadtocanterbury", "title": "The Road to Canterbury", "path": "COG/roadtocanterbury/index.html"}, {"category": "COG", "folder": "robots", "title": "Choice of Robots", "path": "COG/robots/index.html"}, {"category": "COG", "folder": "rockstar", "title": "Choice of the Rock Star", "path": "COG/rockstar/index.html"}, {"category": "COG", "folder": "romance", "title": "Affairs of the Court: Choice of Romance", "path": "COG/romance/index.html"}, {"category": "COG", "folder": "royalaffairs", "title": "Royal Affairs", "path": "COG/royalaffairs/index.html"}, {"category": "COG", "folder": "runtofthelitter", "title": "Runt of the Litter", "path": "COG/runtofthelitter/index.html"}, {"category": "COG", "folder": "sagaofthenorthwind", "title": "Saga of the North Wind", "path": "COG/sagaofthenorthwind/index.html"}, {"category": "COG", "folder": "seaeternal", "title": "The Sea Eternal", "path": "COG/seaeternal/index.html"}, {"category": "COG", "folder": "seventhsea", "title": "7th Sea: A Pirate's Pact", "path": "COG/seventhsea/index.html"}, {"category": "COG", "folder": "showdown", "title": "Showdown at Willow Creek", "path": "COG/showdown/index.html"}, {"category": "COG", "folder": "silverworld", "title": "Silverworld", "path": "COG/silverworld/index.html"}, {"category": "COG", "folder": "sinsofthesires", "title": "Vampire: The Masquerade - Sins of the Sires", "path": "COG/sinsofthesires/index.html"}, {"category": "COG", "folder": "sixthgradedetective", "title": "Sixth Grade Detective", "path": "COG/sixthgradedetective/index.html"}, {"category": "COG", "folder": "skypiratesofactorius", "title": "Sky Pirates of Actorius", "path": "COG/skypiratesofactorius/index.html"}, {"category": "COG", "folder": "skystrike", "title": "Skystrike: Wings of Justice", "path": "COG/skystrike/index.html"}, {"category": "COG", "folder": "slammed", "title": "SLAMMED!", "path": "COG/slammed/index.html"}, {"category": "COG", "folder": "socialservices", "title": "Social Services of the Doomed", "path": "COG/socialservices/index.html"}, {"category": "COG", "folder": "sorceryisforsaps", "title": "Sorcery Is for Saps", "path": "COG/sorceryisforsaps/index.html"}, {"category": "COG", "folder": "spectersofthedeep", "title": "Specters of the Deep", "path": "COG/spectersofthedeep/index.html"}, {"category": "COG", "folder": "spiresurgesea", "title": "Spire, Surge, and Sea", "path": "COG/spiresurgesea/index.html"}, {"category": "COG", "folder": "squirestale", "title": "A Squire's Tale", "path": "COG/squirestale/index.html"}, {"category": "COG", "folder": "starcaptain", "title": "Choice of the Star Captain", "path": "COG/starcaptain/index.html"}, {"category": "COG", "folder": "starcrystalwarriors", "title": "Star Crystal Warriors Go!", "path": "COG/starcrystalwarriors/index.html"}, {"category": "COG", "folder": "starsarisen", "title": "Stars Arisen", "path": "COG/starsarisen/index.html"}, {"category": "COG", "folder": "stronghold", "title": "Stronghold: A Hero's Fate", "path": "COG/stronghold/index.html"}, {"category": "COG", "folder": "stronghold2", "title": "Stronghold: Caverns of Sorcery", "path": "COG/stronghold2/index.html"}, {"category": "COG", "folder": "superlatives", "title": "The Superlatives: Aetherfall", "path": "COG/superlatives/index.html"}, {"category": "COG", "folder": "superlatives2", "title": "The Superlatives: Shattered Worlds", "path": "COG/superlatives2/index.html"}, {"category": "COG", "folder": "swordoftheslayer", "title": "Sword of the Slayer", "path": "COG/swordoftheslayer/index.html"}, {"category": "COG", "folder": "tallyho", "title": "Tally Ho", "path": "COG/tallyho/index.html"}, {"category": "COG", "folder": "teahouse", "title": "Teahouse of the Gods", "path": "COG/teahouse/index.html"}, {"category": "COG", "folder": "thieftaker", "title": "Trials of the Thief-Taker", "path": "COG/thieftaker/index.html"}, {"category": "COG", "folder": "timeofmonsters", "title": "Hunter: The Reckoning - A Time of Monsters", "path": "COG/timeofmonsters/index.html"}, {"category": "COG", "folder": "topvillain", "title": "Top Villain: Total Domination", "path": "COG/topvillain/index.html"}, {"category": "COG", "folder": "towerbehindmoon", "title": "Tower Behind the Moon", "path": "COG/towerbehindmoon/index.html"}, {"category": "COG", "folder": "treasureseekers", "title": "Treasure Seekers of Lady Luck", "path": "COG/treasureseekers/index.html"}, {"category": "COG", "folder": "treboulain", "title": "Siege of Treboulain", "path": "COG/treboulain/index.html"}, {"category": "COG", "folder": "trextimemachine", "title": "T-Rex Time Machine", "path": "COG/trextimemachine/index.html"}, {"category": "COG", "folder": "undercoveragent", "title": "Undercover Agent", "path": "COG/undercoveragent/index.html"}, {"category": "COG", "folder": "undyingfortress", "title": "Undying Fortress", "path": "COG/undyingfortress/index.html"}, {"category": "COG", "folder": "unsupervised", "title": "Unsupervised", "path": "COG/unsupervised/index.html"}, {"category": "COG", "folder": "vampire2", "title": "Choice of the Vampire: The Fall of Memphis", "path": "COG/vampire2/index.html"}, {"category": "COG", "folder": "versus", "title": "VERSUS: The Lost Ones", "path": "COG/versus/index.html"}, {"category": "COG", "folder": "versus2", "title": "VERSUS: The Elite Trials", "path": "COG/versus2/index.html"}, {"category": "COG", "folder": "versus3", "title": "VERSUS: The Deathscapes", "path": "COG/versus3/index.html"}, {"category": "COG", "folder": "viking", "title": "Choice of the Viking", "path": "COG/viking/index.html"}, {"category": "COG", "folder": "warofthecurrents", "title": "Nikola Tesla: War of the Currents", "path": "COG/warofthecurrents/index.html"}, {"category": "COG", "folder": "werewolves2", "title": "Werewolves: Pack Mentality", "path": "COG/werewolves2/index.html"}, {"category": "COG", "folder": "werewolves3", "title": "Werewolves 3: Evolution's End", "path": "COG/werewolves3/index.html"}, {"category": "COG", "folder": "werewolveshavenrising", "title": "Werewolves: Haven Rising", "path": "COG/werewolveshavenrising/index.html"}, {"category": "COG", "folder": "weyrwood", "title": "Weyrwood", "path": "COG/weyrwood/index.html"}, {"category": "COG", "folder": "wiseuseoftime", "title": "A Wise Use of Time", "path": "COG/wiseuseoftime/index.html"}, {"category": "COG", "folder": "witchcraftu", "title": "Witchcraft U", "path": "COG/witchcraftu/index.html"}, {"category": "COG", "folder": "wizardconfidential", "title": "Wizard Confidential", "path": "COG/wizardconfidential/index.html"}, {"category": "COG", "folder": "wraiths", "title": "Wraiths of SENTINEL", "path": "COG/wraiths/index.html"}, {"category": "COG", "folder": "yeti", "title": "Yeti's Parole Officer", "path": "COG/yeti/index.html"}, {"category": "COG", "folder": "zip", "title": "Zip! Speedster of Valiant City", "path": "COG/zip/index.html"}, {"category": "COG", "folder": "zombies", "title": "Choice of Zombies", "path": "COG/zombies/index.html"}, {"category": "HG", "folder": "LastNight", "title": "What Happened Last Night?", "path": "HG/LastNight/index.html"}, {"category": "HG", "folder": "Paranoia", "title": "Paranoia", "path": "HG/Paranoia/index.html"}, {"category": "HG", "folder": "PopcornSodaMurder", "title": "Popcorn, Soda ... Murder?", "path": "HG/PopcornSodaMurder/index.html"}, {"category": "HG", "folder": "SonsOfTheCherry", "title": "The Sons of the Cherry", "path": "HG/SonsOfTheCherry/index.html"}, {"category": "HG", "folder": "academyofdisaster", "title": "Academy of Disaster", "path": "HG/academyofdisaster/index.html"}, {"category": "HG", "folder": "aegissaga", "title": "The Aegis Saga", "path": "HG/aegissaga/index.html"}, {"category": "HG", "folder": "aetherlaag", "title": "The Aether: Life as a God", "path": "HG/aetherlaag/index.html"}, {"category": "HG", "folder": "afterthestorm", "title": "After the Storm", "path": "HG/afterthestorm/index.html"}, {"category": "HG", "folder": "aiaftermath", "title": "AI - Aftermath", "path": "HG/aiaftermath/index.html"}, {"category": "HG", "folder": "apexpatrol", "title": "Apex Patrol", "path": "HG/apexpatrol/index.html"}, {"category": "HG", "folder": "arcanist", "title": "The Arcanist's Journey", "path": "HG/arcanist/index.html"}, {"category": "HG", "folder": "arthurretelling", "title": "Arthur: A Retelling", "path": "HG/arthurretelling/index.html"}, {"category": "HG", "folder": "ascot", "title": "The Ascot", "path": "HG/ascot/index.html"}, {"category": "HG", "folder": "asenseisstory", "title": "A Sensei's Story", "path": "HG/asenseisstory/index.html"}, {"category": "HG", "folder": "balanceofsuperpower", "title": "Balance of Superpower", "path": "HG/balanceofsuperpower/index.html"}, {"category": "HG", "folder": "balanceofsuperpower2", "title": "BOS 2: Tricentennial", "path": "HG/balanceofsuperpower2/index.html"}, {"category": "HG", "folder": "bestofus", "title": "Best of Us", "path": "HG/bestofus/index.html"}, {"category": "HG", "folder": "betweentwo", "title": "Between Two Worlds", "path": "HG/betweentwo/index.html"}, {"category": "HG", "folder": "bigbrainslittlejars", "title": "Big Brains in Little Jars", "path": "HG/bigbrainslittlejars/index.html"}, {"category": "HG", "folder": "bloodforpoppies", "title": "Blood for Poppies", "path": "HG/bloodforpoppies/index.html"}, {"category": "HG", "folder": "bloodmoon", "title": "Blood Moon", "path": "HG/bloodmoon/index.html"}, {"category": "HG", "folder": "breacharchangeljob", "title": "Breach: The Archangel Job", "path": "HG/breacharchangeljob/index.html"}, {"category": "HG", "folder": "brotherswar", "title": "The Brothers' War", "path": "HG/brotherswar/index.html"}, {"category": "HG", "folder": "burnt", "title": "Burn(t)", "path": "HG/burnt/index.html"}, {"category": "HG", "folder": "butlerdidit", "title": "The Butler Did It", "path": "HG/butlerdidit/index.html"}, {"category": "HG", "folder": "captiveoffortune", "title": "Captive of Fortune", "path": "HG/captiveoffortune/index.html"}, {"category": "HG", "folder": "cavesanddinosaurs", "title": "Caves and Dinosaurs", "path": "HG/cavesanddinosaurs/index.html"}, {"category": "HG", "folder": "cityofthesun", "title": "Leas: City of the Sun", "path": "HG/cityofthesun/index.html"}, {"category": "HG", "folder": "clockworkarmy", "title": "Attack of the Clockwork Army", "path": "HG/clockworkarmy/index.html"}, {"category": "HG", "folder": "communitycollegehero", "title": "Community College Hero", "path": "HG/communitycollegehero/index.html"}, {"category": "HG", "folder": "communitycollegehero2", "title": "Community College Hero: Knowledge is Power", "path": "HG/communitycollegehero2/index.html"}, {"category": "HG", "folder": "communitycollegehero25", "title": "Community College Hero 2.5: Fun and Games", "path": "HG/communitycollegehero25/index.html"}, {"category": "HG", "folder": "comradeorczar", "title": "Comrade or Czar", "path": "HG/comradeorczar/index.html"}, {"category": "HG", "folder": "courtingofmissbennet", "title": "The Courting of Miss Bennet", "path": "HG/courtingofmissbennet/index.html"}, {"category": "HG", "folder": "criticalmassblackvein", "title": "Critical Mass: The Black Vein", "path": "HG/criticalmassblackvein/index.html"}, {"category": "HG", "folder": "criticalmassbridge", "title": "Critical Mass: The Bridge", "path": "HG/criticalmassbridge/index.html"}, {"category": "HG", "folder": "dailyblackmail", "title": "The Daily Blackmail", "path": "HG/dailyblackmail/index.html"}, {"category": "HG", "folder": "dancingwithdemons", "title": "Dancing with Demons", "path": "HG/dancingwithdemons/index.html"}, {"category": "HG", "folder": "dariasim", "title": "Daria: A Kingdom Simulator", "path": "HG/dariasim/index.html"}, {"category": "HG", "folder": "dawnofheroes", "title": "Dawn of Heroes", "path": "HG/dawnofheroes/index.html"}, {"category": "HG", "folder": "dawnofsolempire", "title": "Dawn of the Sol Empire", "path": "HG/dawnofsolempire/index.html"}, {"category": "HG", "folder": "dayafterever", "title": "The Day After Ever After", "path": "HG/dayafterever/index.html"}, {"category": "HG", "folder": "deadalready", "title": "Dead Already?", "path": "HG/deadalready/index.html"}, {"category": "HG", "folder": "deathattherectory", "title": "Death at the Rectory", "path": "HG/deathattherectory/index.html"}, {"category": "HG", "folder": "demonhunter", "title": "Trial of the Demon Hunter", "path": "HG/demonhunter/index.html"}, {"category": "HG", "folder": "demonrecollect", "title": "Demon: Recollect", "path": "HG/demonrecollect/index.html"}, {"category": "HG", "folder": "diamantrose", "title": "Diamant Rose", "path": "HG/diamantrose/index.html"}, {"category": "HG", "folder": "dilemma", "title": "Dilemma", "path": "HG/dilemma/index.html"}, {"category": "HG", "folder": "dinosaurislandescape", "title": "Dinosaur Island Escape", "path": "HG/dinosaurislandescape/index.html"}, {"category": "HG", "folder": "dividedwefall", "title": "Divided We Fall", "path": "HG/dividedwefall/index.html"}, {"category": "HG", "folder": "divineascension", "title": "Divine Ascension", "path": "HG/divineascension/index.html"}, {"category": "HG", "folder": "donor", "title": "Donor", "path": "HG/donor/index.html"}, {"category": "HG", "folder": "dontwakemeup", "title": "Don't Wake Me Up", "path": "HG/dontwakemeup/index.html"}, {"category": "HG", "folder": "doomsdayondemand", "title": "Doomsday On Demand", "path": "HG/doomsdayondemand/index.html"}, {"category": "HG", "folder": "doomsdayondemand2", "title": "Doomsday on Demand 2", "path": "HG/doomsdayondemand2/index.html"}, {"category": "HG", "folder": "doublecross", "title": "Double/Cross", "path": "HG/doublecross/index.html"}, {"category": "HG", "folder": "dragonofsteelthorne", "title": "Dragon of Steelthorne", "path": "HG/dragonofsteelthorne/index.html"}, {"category": "HG", "folder": "dragonracer", "title": "Dragon Racer", "path": "HG/dragonracer/index.html"}, {"category": "HG", "folder": "dryadsriddle", "title": "The Dryad's Riddle", "path": "HG/dryadsriddle/index.html"}, {"category": "HG", "folder": "dualnature", "title": "Dual Nature", "path": "HG/dualnature/index.html"}, {"category": "HG", "folder": "eldritchtales", "title": "Eldritch Tales: Inheritance", "path": "HG/eldritchtales/index.html"}, {"category": "HG", "folder": "elementalsaga", "title": "Elemental Saga: The Awakening", "path": "HG/elementalsaga/index.html"}, {"category": "HG", "folder": "endlessnight", "title": "Temple of Endless Night", "path": "HG/endlessnight/index.html"}, {"category": "HG", "folder": "evertreeinn", "title": "Evertree Inn", "path": "HG/evertreeinn/index.html"}, {"category": "HG", "folder": "exodus", "title": "EXODUS: Climate Activist", "path": "HG/exodus/index.html"}, {"category": "HG", "folder": "factionsrotd", "title": "Factions: Raids of the Divided", "path": "HG/factionsrotd/index.html"}, {"category": "HG", "folder": "fallenherorebirth", "title": "Fallen Hero: Rebirth", "path": "HG/fallenherorebirth/index.html"}, {"category": "HG", "folder": "fallenheroretrib", "title": "Fallen Hero: Retribution", "path": "HG/fallenheroretrib/index.html"}, {"category": "HG", "folder": "falrika", "title": "Falrika the Alchemist", "path": "HG/falrika/index.html"}, {"category": "HG", "folder": "familybusiness", "title": "First Year Demons", "path": "HG/familybusiness/index.html"}, {"category": "HG", "folder": "fatehaven", "title": "Fatehaven", "path": "HG/fatehaven/index.html"}, {"category": "HG", "folder": "fernwehsaga1", "title": "The Fernweh Saga: Book One", "path": "HG/fernwehsaga1/index.html"}, {"category": "HG", "folder": "fieldsofasphodel", "title": "Fields of Asphodel", "path": "HG/fieldsofasphodel/index.html"}, {"category": "HG", "folder": "fifty", "title": "Fifty", "path": "HG/fifty/index.html"}, {"category": "HG", "folder": "firstbullrun", "title": "First Bull Run", "path": "HG/firstbullrun/index.html"}, {"category": "HG", "folder": "floatingcity", "title": "The Floating City", "path": "HG/floatingcity/index.html"}, {"category": "HG", "folder": "forgottenone", "title": "I, the Forgotten One", "path": "HG/forgottenone/index.html"}, {"category": "HG", "folder": "formorianwar", "title": "Formorian War", "path": "HG/formorianwar/index.html"}, {"category": "HG", "folder": "fortunethefated", "title": "Fortune the Fated", "path": "HG/fortunethefated/index.html"}, {"category": "HG", "folder": "foundationofnightmares", "title": "Foundation of Nightmares", "path": "HG/foundationofnightmares/index.html"}, {"category": "HG", "folder": "founderssaga", "title": "Founders Saga: The Culling", "path": "HG/founderssaga/index.html"}, {"category": "HG", "folder": "gamblingwitheternity", "title": "Gambling with Eternity", "path": "HG/gamblingwitheternity/index.html"}, {"category": "HG", "folder": "gangsofoldcamp", "title": "The Gangs of Old Camp", "path": "HG/gangsofoldcamp/index.html"}, {"category": "HG", "folder": "ghostsim", "title": "Ghost Simulator", "path": "HG/ghostsim/index.html"}, {"category": "HG", "folder": "gladiator", "title": "Gladiator: Road to the Colosseum", "path": "HG/gladiator/index.html"}, {"category": "HG", "folder": "goldenopportunity", "title": "A Golden Opportunity", "path": "HG/goldenopportunity/index.html"}, {"category": "HG", "folder": "goldenrose1", "title": "The Golden Rose: Book One", "path": "HG/goldenrose1/index.html"}, {"category": "HG", "folder": "grandcasinooffortune", "title": "Grand Casino of Fortune", "path": "HG/grandcasinooffortune/index.html"}, {"category": "HG", "folder": "graypainter", "title": "The Gray Painter", "path": "HG/graypainter/index.html"}, {"category": "HG", "folder": "greatness", "title": "The Paths to Greatness", "path": "HG/greatness/index.html"}, {"category": "HG", "folder": "greattournament", "title": "The Great Tournament", "path": "HG/greattournament/index.html"}, {"category": "HG", "folder": "greattournament2", "title": "The Great Tournament 2", "path": "HG/greattournament2/index.html"}, {"category": "HG", "folder": "greenjourney", "title": "An Unexpectedly Green Journey", "path": "HG/greenjourney/index.html"}, {"category": "HG", "folder": "greyeyesofdeath", "title": "Gray Eyes of Death", "path": "HG/greyeyesofdeath/index.html"}, {"category": "HG", "folder": "grimandi", "title": "The Grim and I", "path": "HG/grimandi/index.html"}, {"category": "HG", "folder": "gunsofinfinity", "title": "Guns of Infinity", "path": "HG/gunsofinfinity/index.html"}, {"category": "HG", "folder": "harbingershead", "title": "The Harbinger's Head", "path": "HG/harbingershead/index.html"}, {"category": "HG", "folder": "hazeunderwindbrooke", "title": "The Haze Under Windbrooke", "path": "HG/hazeunderwindbrooke/index.html"}, {"category": "HG", "folder": "hiddensanctum", "title": "Hidden Sanctum", "path": "HG/hiddensanctum/index.html"}, {"category": "HG", "folder": "highlandsdeepwaters", "title": "Highlands, Deep Waters", "path": "HG/highlandsdeepwaters/index.html"}, {"category": "HG", "folder": "highwaywars", "title": "Highway Wars", "path": "HG/highwaywars/index.html"}, {"category": "HG", "folder": "horrorbehindthewalls", "title": "The Horror Behind the Walls", "path": "HG/horrorbehindthewalls/index.html"}, {"category": "HG", "folder": "houndsofwar", "title": "By Crom", "path": "HG/houndsofwar/index.html"}, {"category": "HG", "folder": "hovbattleroyale", "title": "Hero or Villain: Battle Royale", "path": "HG/hovbattleroyale/index.html"}, {"category": "HG", "folder": "hovgenesis", "title": "Hero or Villain: Genesis", "path": "HG/hovgenesis/index.html"}, {"category": "HG", "folder": "icepeakmountains", "title": "Raiders of the Icepeak Mountains", "path": "HG/icepeakmountains/index.html"}, {"category": "HG", "folder": "imprisoned", "title": "Imprisoned", "path": "HG/imprisoned/index.html"}, {"category": "HG", "folder": "interactivebonbons", "title": "Interactive Bonbons 🍬", "path": "HG/interactivebonbons/index.html"}, {"category": "HG", "folder": "interstellarairgap", "title": "Interstellar Airgap", "path": "HG/interstellarairgap/index.html"}, {"category": "HG", "folder": "inthehallsofasgard", "title": "In the Halls of Asgard", "path": "HG/inthehallsofasgard/index.html"}, {"category": "HG", "folder": "irondestinies", "title": "The Iron Destinies", "path": "HG/irondestinies/index.html"}, {"category": "HG", "folder": "islandofcarnage", "title": "Island Of Carnage", "path": "HG/islandofcarnage/index.html"}, {"category": "HG", "folder": "journeyintodarkness", "title": "Journey Into Darkness", "path": "HG/journeyintodarkness/index.html"}, {"category": "HG", "folder": "keeperotdan", "title": "Keeper of the Day and Night", "path": "HG/keeperotdan/index.html"}, {"category": "HG", "folder": "keeperotsam", "title": "Keeper of the Sun and Moon", "path": "HG/keeperotsam/index.html"}, {"category": "HG", "folder": "keepersvigil", "title": "Keeper's Vigil", "path": "HG/keepersvigil/index.html"}, {"category": "HG", "folder": "keplercolonyevacuation", "title": "The Kepler Colony: Evacuation", "path": "HG/keplercolonyevacuation/index.html"}, {"category": "HG", "folder": "kidnappedpromqueen", "title": "The Kidnapped Prom Queen", "path": "HG/kidnappedpromqueen/index.html"}, {"category": "HG", "folder": "kissfromdeath", "title": "A Kiss from Death", "path": "HG/kissfromdeath/index.html"}, {"category": "HG", "folder": "kitsune", "title": "Kitsune", "path": "HG/kitsune/index.html"}, {"category": "HG", "folder": "knightofthefellowship", "title": "Knight of the Fellowship", "path": "HG/knightofthefellowship/index.html"}, {"category": "HG", "folder": "lastwizard", "title": "The Last Wizard", "path": "HG/lastwizard/index.html"}, {"category": "HG", "folder": "lcquarterback", "title": "Last Chance Quarterback", "path": "HG/lcquarterback/index.html"}, {"category": "HG", "folder": "lifeasalich", "title": "Life as a Lich", "path": "HG/lifeasalich/index.html"}, {"category": "HG", "folder": "lifeofamerc", "title": "Life of a Mercenary", "path": "HG/lifeofamerc/index.html"}, {"category": "HG", "folder": "lifeofamobster", "title": "Life of a Mobster", "path": "HG/lifeofamobster/index.html"}, {"category": "HG", "folder": "longweekend", "title": "A Long Weekend", "path": "HG/longweekend/index.html"}, {"category": "HG", "folder": "lordsofaswick", "title": "Lords of Aswick - First of His Blood", "path": "HG/lordsofaswick/index.html"}, {"category": "HG", "folder": "lordsofinfinity", "title": "Lords of Infinity", "path": "HG/lordsofinfinity/index.html"}, {"category": "HG", "folder": "lostheir", "title": "Lost Heir: The Fall of Daria", "path": "HG/lostheir/index.html"}, {"category": "HG", "folder": "lostheir2", "title": "Lost Heir 2: Forging a Kingdom", "path": "HG/lostheir2/index.html"}, {"category": "HG", "folder": "lostheir3", "title": "The Lost Heir 3: Demon War", "path": "HG/lostheir3/index.html"}, {"category": "HG", "folder": "lostinthepages", "title": "Lost in the Pages", "path": "HG/lostinthepages/index.html"}, {"category": "HG", "folder": "loveatelevation", "title": "Love at Elevation", "path": "HG/loveatelevation/index.html"}, {"category": "HG", "folder": "luxcityofsecrets", "title": "Lux, City of Secrets", "path": "HG/luxcityofsecrets/index.html"}, {"category": "HG", "folder": "macabremansion", "title": "Macabre Mansion", "path": "HG/macabremansion/index.html"}, {"category": "HG", "folder": "machinations", "title": "Machinations: Fog of War", "path": "HG/machinations/index.html"}, {"category": "HG", "folder": "mageelite", "title": "Mage Elite", "path": "HG/mageelite/index.html"}, {"category": "HG", "folder": "magereborn", "title": "A Mage Reborn: Book One", "path": "HG/magereborn/index.html"}, {"category": "HG", "folder": "magesadventure", "title": "The Mage's Adventures", "path": "HG/magesadventure/index.html"}, {"category": "HG", "folder": "magiciansburden", "title": "The Magician's Burden", "path": "HG/magiciansburden/index.html"}, {"category": "HG", "folder": "magikiras", "title": "Magikiras", "path": "HG/magikiras/index.html"}, {"category": "HG", "folder": "marineraider", "title": "Marine Raider", "path": "HG/marineraider/index.html"}, {"category": "HG", "folder": "messageinamelody", "title": "Message in a Melody", "path": "HG/messageinamelody/index.html"}, {"category": "HG", "folder": "meteoric", "title": "Meteoric", "path": "HG/meteoric/index.html"}, {"category": "HG", "folder": "midnightsaga1", "title": "The Midnight Saga: The Monster", "path": "HG/midnightsaga1/index.html"}, {"category": "HG", "folder": "missingwings", "title": "Missing Wings", "path": "HG/missingwings/index.html"}, {"category": "HG", "folder": "moonrise", "title": "Moonrise", "path": "HG/moonrise/index.html"}, {"category": "HG", "folder": "mtfh", "title": "Mobile Armored Marine: Mission to Far Hope", "path": "HG/mtfh/index.html"}, {"category": "HG", "folder": "mummyisnotanantique", "title": "A Mummy Is Not An Antique", "path": "HG/mummyisnotanantique/index.html"}, {"category": "HG", "folder": "mydayoffwork", "title": "My Day off Work", "path": "HG/mydayoffwork/index.html"}, {"category": "HG", "folder": "nascentnecromancer", "title": "The Nascent Necromancer", "path": "HG/nascentnecromancer/index.html"}, {"category": "HG", "folder": "nebynwoz", "title": "NE By NW Oz", "path": "HG/nebynwoz/index.html"}, {"category": "HG", "folder": "nightmaremaze", "title": "The Nightmare Maze", "path": "HG/nightmaremaze/index.html"}, {"category": "HG", "folder": "noproperthief", "title": "No Proper Thief", "path": "HG/noproperthief/index.html"}, {"category": "HG", "folder": "nuclearpoweredtoaster", "title": "Nuclear Powered Toaster", "path": "HG/nuclearpoweredtoaster/index.html"}, {"category": "HG", "folder": "oldestdream", "title": "The Oldest Dream", "path": "HG/oldestdream/index.html"}, {"category": "HG", "folder": "oneminmysteries", "title": "One Minute Mysteries", "path": "HG/oneminmysteries/index.html"}, {"category": "HG", "folder": "paradigmcity", "title": "Paradigm City", "path": "HG/paradigmcity/index.html"}, {"category": "HG", "folder": "paradoxfactor", "title": "Paradox Factor", "path": "HG/paradoxfactor/index.html"}, {"category": "HG", "folder": "parentingsimulator", "title": "The Parenting Simulator", "path": "HG/parentingsimulator/index.html"}, {"category": "HG", "folder": "passenger", "title": "The Passenger", "path": "HG/passenger/index.html"}, {"category": "HG", "folder": "pathoflight", "title": "Path of Light", "path": "HG/pathoflight/index.html"}, {"category": "HG", "folder": "pathtoknighthood", "title": "Path to Knighthood", "path": "HG/pathtoknighthood/index.html"}, {"category": "HG", "folder": "peopleshouse", "title": "The People's House", "path": "HG/peopleshouse/index.html"}, {"category": "HG", "folder": "piratesofdonkeyisland", "title": "Pirates of Donkey Island", "path": "HG/piratesofdonkeyisland/index.html"}, {"category": "HG", "folder": "planetaryquarantine", "title": "Planetary Quarantine", "path": "HG/planetaryquarantine/index.html"}, {"category": "HG", "folder": "presidentdisaster", "title": "President Disaster", "path": "HG/presidentdisaster/index.html"}, {"category": "HG", "folder": "prideprejudicemurder", "title": "Pride and Prejudice and Murder", "path": "HG/prideprejudicemurder/index.html"}, {"category": "HG", "folder": "rainking", "title": "Rain King", "path": "HG/rainking/index.html"}, {"category": "HG", "folder": "relics2", "title": "Relics 2: The Crusader's Tomb", "path": "HG/relics2/index.html"}, {"category": "HG", "folder": "relicsofthelostage", "title": "Relics of the Lost Age", "path": "HG/relicsofthelostage/index.html"}, {"category": "HG", "folder": "robinhood", "title": "Who Was The Real Robin Hood?", "path": "HG/robinhood/index.html"}, {"category": "HG", "folder": "sabresofinfinity", "title": "Sabres of Infinity", "path": "HG/sabresofinfinity/index.html"}, {"category": "HG", "folder": "sagaofoedipusrex", "title": "The Saga Of Oedipus Rex", "path": "HG/sagaofoedipusrex/index.html"}, {"category": "HG", "folder": "samurai4", "title": "Samurai of Hyuga Book 4", "path": "HG/samurai4/index.html"}, {"category": "HG", "folder": "samurai5", "title": "Samurai of Hyuga Book 5", "path": "HG/samurai5/index.html"}, {"category": "HG", "folder": "samuraihyuga6", "title": "Samurai of Hyuga Book 6", "path": "HG/samuraihyuga6/index.html"}, {"category": "HG", "folder": "samuraiofhyuga", "title": "Samurai of Hyuga", "path": "HG/samuraiofhyuga/index.html"}, {"category": "HG", "folder": "samuraiofhyuga2", "title": "Samurai of Hyuga Book 2", "path": "HG/samuraiofhyuga2/index.html"}, {"category": "HG", "folder": "samuraiofhyuga3", "title": "Samurai of Hyuga Book 3", "path": "HG/samuraiofhyuga3/index.html"}, {"category": "HG", "folder": "saturnine", "title": "Saturnine", "path": "HG/saturnine/index.html"}, {"category": "HG", "folder": "scalesofjustice", "title": "Scales of Justice: Book One", "path": "HG/scalesofjustice/index.html"}, {"category": "HG", "folder": "scarletsails", "title": "Scarlet Sails", "path": "HG/scarletsails/index.html"}, {"category": "HG", "folder": "scoreofalifetime", "title": "Score of a Lifetime", "path": "HG/scoreofalifetime/index.html"}, {"category": "HG", "folder": "scratch", "title": "Scratch", "path": "HG/scratch/index.html"}, {"category": "HG", "folder": "sevenbullets", "title": "Seven Bullets", "path": "HG/sevenbullets/index.html"}, {"category": "HG", "folder": "shadowhorror", "title": "The Shadow Horror", "path": "HG/shadowhorror/index.html"}, {"category": "HG", "folder": "shadowsociety", "title": "The Shadow Society", "path": "HG/shadowsociety/index.html"}, {"category": "HG", "folder": "silentgear", "title": "Silent Gear", "path": "HG/silentgear/index.html"}, {"category": "HG", "folder": "slayerofevil", "title": "Slayer of Evil", "path": "HG/slayerofevil/index.html"}, {"category": "HG", "folder": "soccerstriker", "title": "Super Star Soccer Striker", "path": "HG/soccerstriker/index.html"}, {"category": "HG", "folder": "sommetrench", "title": "Somme Trench", "path": "HG/sommetrench/index.html"}, {"category": "HG", "folder": "sorcerersstory", "title": "Sorcerer's Story", "path": "HG/sorcerersstory/index.html"}, {"category": "HG", "folder": "sordwin", "title": "Sordwin: The Evertree Saga", "path": "HG/sordwin/index.html"}, {"category": "HG", "folder": "soulstonewar", "title": "The Soul Stone War", "path": "HG/soulstonewar/index.html"}, {"category": "HG", "folder": "soulstonewar2", "title": "The Soul Stone War 2", "path": "HG/soulstonewar2/index.html"}, {"category": "HG", "folder": "soulstonewar3", "title": "The Soul Stone War 3", "path": "HG/soulstonewar3/index.html"}, {"category": "HG", "folder": "soyourepossessed", "title": "So, You're Possessed!", "path": "HG/soyourepossessed/index.html"}, {"category": "HG", "folder": "spaceforcecaptain", "title": "Life of a Space Force Captain", "path": "HG/spaceforcecaptain/index.html"}, {"category": "HG", "folder": "spacingout", "title": "Spacing Out", "path": "HG/spacingout/index.html"}, {"category": "HG", "folder": "spyandthelabyrinth", "title": "The Spy and the Labyrinth", "path": "HG/spyandthelabyrinth/index.html"}, {"category": "HG", "folder": "starshipadventures", "title": "Starship Adventures", "path": "HG/starshipadventures/index.html"}, {"category": "HG", "folder": "streetjamtherise", "title": "Street Jam: The Rise", "path": "HG/streetjamtherise/index.html"}, {"category": "HG", "folder": "studiesindarkness", "title": "Studies in Darkness", "path": "HG/studiesindarkness/index.html"}, {"category": "HG", "folder": "studyinsteampunk", "title": "A Study in Steampunk: Choice by Gaslight", "path": "HG/studyinsteampunk/index.html"}, {"category": "HG", "folder": "swampcastle", "title": "Swamp Castle", "path": "HG/swampcastle/index.html"}, {"category": "HG", "folder": "swordofrhivenia", "title": "The Sword of Rhivenia: Book One", "path": "HG/swordofrhivenia/index.html"}, {"category": "HG", "folder": "swordoftheelements", "title": "The Sword of the Elements. Part 1. To the world's end.", "path": "HG/swordoftheelements/index.html"}, {"category": "HG", "folder": "taloncity", "title": "Talon City: Death from Above", "path": "HG/taloncity/index.html"}, {"category": "HG", "folder": "therace", "title": "The Race", "path": "HG/therace/index.html"}, {"category": "HG", "folder": "threeclass", "title": "Land of three classes - The Exam", "path": "HG/threeclass/index.html"}, {"category": "HG", "folder": "threegames", "title": "The 3Games", "path": "HG/threegames/index.html"}, {"category": "HG", "folder": "threetotango", "title": "It Takes Three to Tango", "path": "HG/threetotango/index.html"}, {"category": "HG", "folder": "throneofblood", "title": "Throne of Blood: Book 1", "path": "HG/throneofblood/index.html"}, {"category": "HG", "folder": "tinstar", "title": "Tin Star", "path": "HG/tinstar/index.html"}, {"category": "HG", "folder": "toashesyoushallreturn", "title": "To Ashes You Shall Return", "path": "HG/toashesyoushallreturn/index.html"}, {"category": "HG", "folder": "tokyowizard", "title": "Tokyo Wizard", "path": "HG/tokyowizard/index.html"}, {"category": "HG", "folder": "tombofthekhan", "title": "Tomb of the Khan", "path": "HG/tombofthekhan/index.html"}, {"category": "HG", "folder": "toodifferent", "title": "Too Different", "path": "HG/toodifferent/index.html"}, {"category": "HG", "folder": "totemforce", "title": "Totem Force", "path": "HG/totemforce/index.html"}, {"category": "HG", "folder": "treasureoftheforgottencity", "title": "Treasure of the Forbidden City", "path": "HG/treasureoftheforgottencity/index.html"}, {"category": "HG", "folder": "treesdonttell", "title": "Trees Don't Tell", "path": "HG/treesdonttell/index.html"}, {"category": "HG", "folder": "tudorintrigue", "title": "Tudor Intrigue", "path": "HG/tudorintrigue/index.html"}, {"category": "HG", "folder": "turncoat", "title": "Turncoat Chronicle", "path": "HG/turncoat/index.html"}, {"category": "HG", "folder": "twelvetrials", "title": "The Twelve Trials", "path": "HG/twelvetrials/index.html"}, {"category": "HG", "folder": "twinflames", "title": "Twin Flames", "path": "HG/twinflames/index.html"}, {"category": "HG", "folder": "twocranes", "title": "Tale of Two Cranes", "path": "HG/twocranes/index.html"}, {"category": "HG", "folder": "unnatural", "title": "UnNatural", "path": "HG/unnatural/index.html"}, {"category": "HG", "folder": "unnatural2", "title": "Unnatural Season Two", "path": "HG/unnatural2/index.html"}, {"category": "HG", "folder": "vampirehouse", "title": "The Vampire House", "path": "HG/vampirehouse/index.html"}, {"category": "HG", "folder": "vampireregent", "title": "The Vampire Regent", "path": "HG/vampireregent/index.html"}, {"category": "HG", "folder": "velocity", "title": "Velocity: The Race Begins", "path": "HG/velocity/index.html"}, {"category": "HG", "folder": "volunteerfirefighter", "title": "The Volunteer Firefighter", "path": "HG/volunteerfirefighter/index.html"}, {"category": "HG", "folder": "warformagincia", "title": "War for Magincia", "path": "HG/warformagincia/index.html"}, {"category": "HG", "folder": "warforwest", "title": "The War for the West", "path": "HG/warforwest/index.html"}, {"category": "HG", "folder": "warof2022", "title": "The War of 2022", "path": "HG/warof2022/index.html"}, {"category": "HG", "folder": "warofthegods", "title": "War of the Gods", "path": "HG/warofthegods/index.html"}, {"category": "HG", "folder": "wayhaven1", "title": "Wayhaven Chronicles: Book One", "path": "HG/wayhaven1/index.html"}, {"category": "HG", "folder": "wayhaven2", "title": "Wayhaven Chronicles: Book Two", "path": "HG/wayhaven2/index.html"}, {"category": "HG", "folder": "wayhaven3", "title": "Wayhaven Chronicles: Book Three", "path": "HG/wayhaven3/index.html"}, {"category": "HG", "folder": "waywalkers", "title": "Way Walkers: University", "path": "HG/waywalkers/index.html"}, {"category": "HG", "folder": "waywalkers2", "title": "Way Walkers: University 2", "path": "HG/waywalkers2/index.html"}, {"category": "HG", "folder": "whiskeyfour", "title": "Whiskey-Four", "path": "HG/whiskeyfour/index.html"}, {"category": "HG", "folder": "wizardrylevelc", "title": "Wizardry Level C", "path": "HG/wizardrylevelc/index.html"}, {"category": "HG", "folder": "wizardslife", "title": "Life of a Wizard", "path": "HG/wizardslife/index.html"}, {"category": "HG", "folder": "ww2armored", "title": "World War II Armored Recon", "path": "HG/ww2armored/index.html"}, {"category": "HG", "folder": "zebulon", "title": "Zebulon", "path": "HG/zebulon/index.html"}, {"category": "HG", "folder": "zombieexodus", "title": "Zombie Exodus", "path": "HG/zombieexodus/index.html"}, {"category": "HG", "folder": "zombieexodussafehaven", "title": "Zombie Exodus: Safe Haven", "path": "HG/zombieexodussafehaven/index.html"}, {"category": "HG", "folder": "zombien", "title": "Zombien", "path": "HG/zombien/index.html"}, {"category": "HG", "folder": "zoopocalypse", "title": "Zoo-pocalypse", "path": "HG/zoopocalypse/index.html"}];
+
+    let currentFilter = 'ALL';
+    let currentAlpha = 'ALL';
+    let searchQuery = '';
+    let isGridView = true;
+    let isDarkMode = localStorage.getItem('theme') === 'dark';
+    let favorites = new Set(JSON.parse(localStorage.getItem('fav_games') || '[]'));
+
+    const container = document.getElementById('games-container');
+    const searchInput = document.getElementById('search-input');
+    const clearSearch = document.getElementById('clear-search');
+    const alphaBar = document.getElementById('alpha-bar');
+    const viewToggleBtn = document.getElementById('view-toggle-btn');
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    const viewIcon = document.getElementById('view-icon');
+    const surpriseBtn = document.getElementById('surprise-btn');
+    const backToTopBtn = document.getElementById('back-to-top');
+
+    // Theme logic
+    function applyTheme() {
+      if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+        themeToggleBtn.textContent = '🌙 Gelap';
+      } else {
+        document.body.classList.remove('dark-mode');
+        themeToggleBtn.textContent = '📜 Kertas';
+      }
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      isDarkMode = !isDarkMode;
+      localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+      applyTheme();
+    });
+
+    // Init Alphabet Bar
+    function initAlphaBar() {
+      const letters = ['ALL', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
+      alphaBar.innerHTML = letters.map(l => 
+        `<button class="alpha-btn ${l === 'ALL' ? 'active' : ''}" data-alpha="${l}">${l}</button>`
+      ).join('');
+    }
+
+    // Filter Logic
+    function getFilteredGames() {
+      const q = searchQuery.toLowerCase().trim();
+      return GAMES_DATA.filter(game => {
+        // Category Filter
+        if (currentFilter === 'COG' && game.category !== 'COG') return false;
+        if (currentFilter === 'HG' && game.category !== 'HG') return false;
+        if (currentFilter === 'FAV' && !favorites.has(game.path)) return false;
+
+        // Alphabet Filter
+        if (currentAlpha !== 'ALL') {
+          const firstChar = game.title.charAt(0).toUpperCase();
+          if (firstChar !== currentAlpha) return false;
+        }
+
+        // Search Query
+        if (q) {
+          const titleMatch = game.title.toLowerCase().includes(q);
+          const folderMatch = game.folder.toLowerCase().includes(q);
+          return titleMatch || folderMatch;
+        }
+
+        return true;
+      });
+    }
+
+    // Render Function
+    function render() {
+      const filtered = getFilteredGames();
+      
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="no-results">
+            <h3>Tidak Ada Game Ditemukan</h3>
+            <p>Coba sesuaikan kata kunci pencarian atau filter kategori Anda.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.className = isGridView ? 'grid-view' : 'list-view';
+
+      container.innerHTML = filtered.map(game => {
+        const isFav = favorites.has(game.path);
+        return `
+          <a href="${game.path}" class="game-card ${game.category}" target="_blank" rel="noopener">
+            <div class="card-top">
+              <span class="badge ${game.category}">${game.category}</span>
+              <button class="fav-star ${isFav ? 'active' : ''}" 
+                      data-path="${game.path}" 
+                      title="${isFav ? 'Hapus dari favorit' : 'Tambah ke favorit'}"
+                      onclick="toggleFavorite(event, '${game.path}')">
+                ${isFav ? '★' : '☆'}
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="card-title">${escapeHtml(game.title)}</div>
+              <div class="card-folder">📁 ${escapeHtml(game.folder)}</div>
+            </div>
+            <div class="card-footer">
+              <span class="play-link">Buka Game ➔</span>
+            </div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function toggleFavorite(event, path) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (favorites.has(path)) {
+        favorites.delete(path);
+      } else {
+        favorites.add(path);
+      }
+      localStorage.setItem('fav_games', JSON.stringify([...favorites]));
+      render();
+    }
+
+    // Event Listeners
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      render();
+    });
+
+    clearSearch.addEventListener('click', () => {
+      searchInput.value = '';
+      searchQuery = '';
+      render();
+    });
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        render();
+      });
+    });
+
+    alphaBar.addEventListener('click', (e) => {
+      if (e.target.classList.contains('alpha-btn')) {
+        document.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        currentAlpha = e.target.dataset.alpha;
+        render();
+      }
+    });
+
+    viewToggleBtn.addEventListener('click', () => {
+      isGridView = !isGridView;
+      viewIcon.textContent = isGridView ? '☰' : '☷';
+      render();
+    });
+
+    surpriseBtn.addEventListener('click', () => {
+      const filtered = getFilteredGames();
+      if (filtered.length > 0) {
+        const randomGame = filtered[Math.floor(Math.random() * filtered.length)];
+        window.open(randomGame.path, '_blank');
+      }
+    });
+
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 300) {
+        backToTopBtn.classList.add('visible');
+      } else {
+        backToTopBtn.classList.remove('visible');
+      }
+    });
+
+    backToTopBtn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // Initialize
+    applyTheme();
+    initAlphaBar();
+    render();
+  </script>
+</body>
+</html>
