@@ -1,0 +1,2962 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dead Already? — ChoiceScript</title>
+  <style>
+:root {
+  --bg: #f4f1ea;
+  --fg: #222;
+  --muted: #888;
+  --accent: #7a5c3e;
+  --card: #fbf9f3;            /* warm paper white (was pure #fff) */
+  --border: #ddd;
+  --topbar-h: 3rem;
+  --choice: #2f5d78;          /* live options / questions — cool blue */
+  --choice-bg: #eef4f8;
+  --chosen: #3d6b3d;          /* recorded answers in the log — green */
+  --chosen-bg: #eef5ec;
+
+  /* ---- paper texture (customizable) ----------------------------------
+     Thin horizontal "corrugated paper" lines. Tweak the three knobs below:
+       --paper-line-color : ink color + opacity of each line
+       --paper-line       : thickness of each line
+       --paper-gap        : distance from one line to the next (the period)
+     The lines are painted with background-attachment: scroll so they move
+     WITH the page as you scroll — the text looks printed onto the paper,
+     not floating over a fixed pattern. To disable, set --paper-texture:none. */
+  --paper-line-color: rgba(34, 30, 25, .04);
+  --paper-line: 1px;
+  --paper-gap: 3px;
+  --paper-texture: repeating-linear-gradient(
+    0deg,
+    var(--paper-line-color) 0,
+    var(--paper-line-color) var(--paper-line),
+    transparent var(--paper-line),
+    transparent var(--paper-gap)
+  );
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: var(--topbar-h); }
+body {
+  margin: 0;
+  background-color: var(--bg);
+  /* Paper lines scroll with the page (not fixed), so the text reads as if
+     printed onto the sheet rather than sliding over a static backdrop. */
+  background-image: var(--paper-texture);
+  background-attachment: scroll;
+  color: var(--fg);
+  font: 17px/1.6 Georgia, "Times New Roman", serif;
+}
+h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+.muted { color: var(--muted); }
+.small { font-size: .8rem; }
+.err, .error { color: #a33; }
+
+/* buttons (shared) */
+.btn {
+  font: inherit; padding: .5rem .8rem;
+  background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--fg); cursor: pointer;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { color: var(--muted); cursor: not-allowed; }
+.btn.small { font-size: .8rem; padding: .35rem .7rem; }
+.btn.danger { color: #a33; border-color: #e0b4b4; }
+
+/* ---- landing page (index.html) ---- */
+.wrap { max-width: 40rem; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
+.games { list-style: none; padding: 0; margin: 1.5rem 0 0; }
+.games li { padding: .6rem 0; border-bottom: 1px solid var(--border); }
+.games a { color: var(--accent); text-decoration: none; font-size: 1.15rem; }
+.games a:hover { text-decoration: underline; }
+
+/* ---- sticky topbar ---- */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: .4rem;
+  min-height: var(--topbar-h);
+  padding: .45rem .9rem;
+  background: color-mix(in srgb, var(--bg) 88%, #fff);
+  backdrop-filter: saturate(1.1) blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar .title { font-weight: bold; font-size: .95rem; }
+.topbar .spacer { flex: 1; }
+
+/* ---- layout: story (+ optional stats panel) ---- */
+.layout {
+  max-width: 42rem; margin: 0 auto; padding: 1.5rem 1.25rem 5rem;
+  transition: max-width .2s ease;
+}
+.main { min-width: 0; }
+
+/* When stats are open on a wide screen, split into two panels. */
+body.stats-open .layout {
+  max-width: 76rem;
+  display: flex; align-items: flex-start; gap: 1.5rem;
+}
+body.stats-open .main { flex: 1 1 auto; }
+
+/* ---- progress segments ---- */
+.segment {
+  background-color: var(--card);
+  /* Paper lines printed onto the reading surface itself, aligned to the
+     page grid (fixed origin) so lines are continuous card-to-card. */
+  background-image: var(--paper-texture);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin: 0 0 1rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,.03);
+}
+.segment:last-child { margin-bottom: 0; }
+
+/* story text */
+.story .para { margin: 0 0 1rem; white-space: pre-wrap; }
+.story .para:last-child { margin-bottom: 0; }
+.achievement { color: var(--accent); font-weight: bold; }
+
+/* recorded answer in the history log — distinct from narration */
+.story .chosen {
+  margin: 0 0 1rem; padding: .4rem .7rem;
+  background: var(--chosen-bg);
+  border-left: 3px solid var(--chosen);
+  border-radius: 0 5px 5px 0;
+  color: var(--chosen); font-style: italic;
+}
+.story .chosen:last-child { margin-bottom: 0; }
+.story .chosen .chosen-mark { font-weight: bold; }
+.story .chosen .chosen-text { font-weight: bold; }
+
+/* illustrations (*image / *text_image) */
+.story-image { margin: .75rem 0; }
+/* darken blend lets the paper lines beneath show through the image's light
+   areas, so the illustration reads as printed onto the same sheet as the text
+   rather than pasted on top. Whites drop out; darks stay. */
+.story-image img {
+  max-width: 100%; height: auto; border-radius: 6px; display: block;
+  mix-blend-mode: darken;
+}
+.story-image.align-center { text-align: center; }
+.story-image.align-center img { margin: 0 auto; }
+.story-image.align-right img { margin-left: auto; }
+.story-image.align-left img { margin-right: auto; }
+
+/* stat chart */
+.statchart { margin: .75rem 0; }
+.stat-text { font-size: .95rem; margin: .25rem 0; }
+.stat-bar { display: flex; align-items: center; gap: .5rem; margin: .35rem 0; font-size: .9rem; }
+.stat-bar .stat-label { flex: 0 0 40%; }
+.stat-bar .bar-track { flex: 1; height: .7rem; background: #eee; border-radius: 4px; overflow: hidden; }
+.stat-bar .bar-fill { display: block; height: 100%; background: var(--accent); }
+.stat-bar .stat-pct { flex: 0 0 2.75rem; text-align: right; color: var(--muted); }
+/* magic-style meters: colored fill (color set inline per discipline) plus the
+   raw score at the end rather than a percentage. */
+.stat-bar.colored-bar .stat-label { flex: 0 0 30%; }
+.stat-bar.colored-bar .bar-track { height: 1rem; }
+
+/* ---- prompt / choices ---- */
+/* The live decision area is tinted (cool blue) so it reads as "your turn",
+   clearly distinct from the narration cards above it. */
+#prompt { margin-top: 1rem; }
+.choices { display: flex; flex-direction: column; gap: .5rem; margin: 0; }
+.btn.choice {
+  display: block; width: 100%; text-align: left; padding: .7rem .9rem;
+  color: var(--choice); border-color: color-mix(in srgb, var(--choice) 35%, var(--border));
+  background: var(--choice-bg);
+}
+.btn.choice:hover:not(:disabled) {
+  border-color: var(--choice);
+  background: color-mix(in srgb, var(--choice-bg) 80%, #fff);
+}
+.btn.choice:disabled { color: var(--muted); background: var(--card); }
+.btn.choice .locked { font-size: .8rem; color: var(--muted); }
+.btn.next { margin-top: .5rem; color: var(--choice); border-color: color-mix(in srgb, var(--choice) 35%, var(--border)); }
+
+form.inputform { display: flex; gap: .5rem; margin: .5rem 0; }
+form.inputform .textinput { font: inherit; padding: .4rem .6rem; border: 1px solid color-mix(in srgb, var(--choice) 35%, var(--border)); border-radius: 6px; flex: 1; }
+
+.ending { color: var(--accent); font-weight: bold; font-size: 1.1rem; margin: 1rem 0; }
+
+/* ---- stats panel ---- */
+.stats-panel { display: none; }
+.stats-panel .stats-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: .75rem;
+}
+.stats-panel .stats-head h2 { margin: 0; font-size: 1.15rem; }
+.stats-body .para { white-space: pre-wrap; margin: 0 0 .75rem; }
+
+body.stats-open .stats-panel {
+  display: block;
+  background-color: var(--card);
+  background-image: var(--paper-texture);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+/* Wide screens: stats panel is a sticky right column. */
+@media (min-width: 60rem) {
+  body.stats-open .stats-panel {
+    flex: 0 0 24rem;
+    position: sticky;
+    top: calc(var(--topbar-h) + 1rem);
+    max-height: calc(100vh - var(--topbar-h) - 2rem);
+    overflow: auto;
+  }
+}
+
+/* Narrow screens: stats panel overlays the story. */
+@media (max-width: 59.99rem) {
+  body.stats-open .layout { display: block; max-width: 42rem; }
+  body.stats-open .stats-panel {
+    position: fixed; z-index: 90;
+    top: var(--topbar-h); left: 0; right: 0; bottom: 0;
+    border-radius: 0; overflow: auto;
+  }
+}
+
+/* ---- save / load modal ---- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.4);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.modal {
+  background: var(--card); border-radius: 10px; padding: 1.25rem;
+  max-width: 32rem; width: 100%; max-height: 80vh; overflow: auto;
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+.modal-head h2 { margin: 0; font-size: 1.2rem; }
+.savelist { display: flex; flex-direction: column; gap: .4rem; }
+.saverow { display: flex; gap: .5rem; }
+.saverow .btn:first-child { flex: 1; text-align: left; font-size: .9rem; }
+
+/* ---- flash toast ---- */
+.flash {
+  position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);
+  z-index: 300; background: #333; color: #fff; padding: .5rem .9rem;
+  border-radius: 6px; font-size: .85rem;
+}
+
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <button id="btn-menu" class="btn small">&larr; Games</button>
+    <span id="game-title" class="title"></span>
+    <span class="spacer"></span>
+    <button id="btn-stats" class="btn small">Stats</button>
+    <button id="btn-save" class="btn small">Save</button>
+    <button id="btn-load" class="btn small">Load</button>
+    <button id="btn-restart" class="btn small">Restart</button>
+  </div>
+
+  <div class="layout">
+    <main class="main">
+      <div id="story" class="story"></div>
+      <div id="prompt"></div>
+    </main>
+    <aside id="stats-panel" class="stats-panel" aria-hidden="true">
+      <div class="stats-head">
+        <h2>Stats</h2>
+        <button id="btn-stats-close" class="btn small">Close</button>
+      </div>
+      <div id="stats-body" class="stats-body"></div>
+    </aside>
+  </div>
+
+<script>
+window.__CS_OFFLINE__ = {"game": "deadalready", "title": "Dead Already?", "scenes": {"choicescript_description": "Life is not fair, neither is this game. Another short murder mystery for you to solve following ChoiceScript multiple-choice text-based format. The murderer is randomly selected at the beginning of each game for a greater challenge.\n\n[i]Dead Already?[/i] is a 7,000-word interactive novel by Kie Brooks. It's entirely text-based, without graphics or sound effects, and fueled by the vast, unstoppable power of your imagination.", "choicescript_stats": "These are your statistics!\n\n*stat_chart\n\tpercent recall Recall\n\tpercent strength Power\n", "choicescript_upgrade": "*label start\n*check_purchase adfree\n\n*if choice_purchased_adfree = false\n  ADVERTISING\n  \n  Remove advertisements.\n  \n  *purchase adfree $0.99 start\n\n*if choice_purchased_everything\n  You're completely upgraded!\n  *goto purchased_list\n*elseif choice_restore_purchases_allowed\n  RESTORE TRANSACTIONS\n  \n  If you've made purchases on another device, click here to transfer and restore your purchases on this device.\n  \n  *restore_purchases start\n\n*label purchased_list\n\n*if choice_purchased_adfree\n  ADVERTISING\n  \n  You've paid to remove advertisements.\n", "dead_already_begins.choice": "*reset", "dead_already_intro.choice": "*reset", "dead_already_plan.choice": "*comment Copyright 2011 by Kie Brooks\n*disable_reuse\n\n*temp murderer_guess\n*set murderer_guess \"\"\n*temp murderer_guess_full\n*set murderer_guess_full \"\"\n\nSo you figure that you know enough of your past to have a stab at finding out how you died.\n\nHow did you die? Who is the murderer? Here you can review suspects (but only once).\n*label label_suspects\nThe suspects are:\n*fake_choice\n\t#The lawyer.\n\t\tDid the lawyer work in collusion with your wife? Or did he just want you out of the scene.\n\n\t#Your widow.\n\t\tDid your wife murder you for the insurance money?\n\n\t#Your old girlfriend.\n\t\tDid your girlfriend murder you in a fit of jealousy?\n\n\t#Your old boss.\n\t\tDid your old boss murder you to claim your work as his own? Or was he paid by the corporation?\n\n\t#The detective.\n\t\tDid the detective murder you so that your girlfriend would look to him instead?\n\n\t#The corporation.\n\t\tDid the corporation murder you because of your work?\n\n\t#Your old colleague.\n\t\tDid your colleague murder you for better promotional prospects? Or was he paid by the corporation?\n\n\t#The man in the gorilla-suit.\n\t\tDid the man in the gorilla-suit murder you because of professional rivalry?\n\n\t#It was an accident.\n\t\tWas your death merely an accident?\n\n\t*allow_reuse #The butler.\n\t\tIt's always the butler! Hold on a second there is no butler in this game.\n\n\n*label after_suspects\n\nPick the person you feel is the most likely culprit and use your remaining strength to try to draw out some clues and get your revenge.\n\n*choice\n\t*allow_reuse #Review the list of suspects.\n\t\tBack to the line up.\n\t\t*goto label_suspects\n\t*if (strength > 25)\n\t\t*allow_reuse #Pick one of the suspects to investigate.\n\t\t\t*goto suspect_testing\n\t#Take revenge.\n\t\t*goto label_revenge\n\n\n*label suspect_testing\n\nYour current strength is ${strength}.\nYou feel strong enough to interact with the suspects but every time you do it will drain your strength.\n*set strength -25\n\n*choice\n\t#The lawyer.\n\t\tYou find the lawyer in his offices looking over various legal documents.\n\t\tHe receives a call on his mobile. He checks the caller and having seen that it is your wife, he begins to look harried.\n\n\t\tYou would like to say something to the lawyer but you are unable to get a word in over your wife (or more accurately your widow);\n\t\tneither for that matter is the lawyer.\n\n\t\t*if (murderer = \"lawyer\")\n\t\t\tAt the end of the unpleasant telephone harassment the lawyer hangs up with a sigh.\n\t\t\t\"Aargh, why did I do it?\", he cries. You wonder if he is speaking of murder.\n\t\t\t*goto after_suspects\n\t\t*else\n\t\t\tAt the end of the unpleasant telephone harassment the lawyer hangs up with a sigh.\n\t\t\t\"Life was so much more pleasant when your husband was still alive\", he whimpers.\n\t\t\tYou do not think that the lawyer was responsible for your death.\n\t\t\t*goto after_suspects\n\n\t#Your widow.\n\t\t*comment You find your widow lying in the bedroom painting her toenails, much richer from the insurance money now that you are deceased.\n\t\tYou find your widow lying in the bedroom painting her toenails.\n\n\t\tYou whisper in her ear, \"do you miss me?\".\n\n\t\t*if (murderer = \"wife\")\n\t\t\tHer eyes widen and she turns pale. She swallows and tries to speak.\n\t\t\t\"Oh darling, I'm so happy to hear your voice\", she says in a strained voice.\n\t\t\tYou wonder if she had a hand in your murder.\n\t\t\t*goto after_suspects\n\t\t*else\n\t\t\tTears begin streaming down her eyes, she is obviously upset.\n\t\t\tYou are convinced that she was not involved in your untimely demise.\n\t\t\t*goto after_suspects\n\n\t#Your old girlfriend.\n\t\tYou find your old girlfriend back in her flat resting on the couch.\n\t\tYou whisper in her ear, \"I will be with you even from the grave\".\n\n\t\t*if (murderer = \"girlfriend\")\n\t\t\tShe turns a shade of white and trembling replies \"Errr, I miss you too\".\n\t\t\tIt does not seem sincere. You wonder if she had a hand in your murder.\n\t\t\t*goto after_suspects\n\t\t*else\n\t\t\tShe bursts into tears and you feel bad for upsetting her.\n\t\t\tYou feel convinced that she is innocent of any foul play.\n\t\t\t*goto after_suspects\n\n\t#The detective.\n\t\tYou find the detective sitting at a desk by the whiteboard in the police station.\n\t\tYou whisper in his ear, \"Who are you trying to pin the blame on?\".\n\n\t\t*if (murderer = \"detective\")\n\t\t\tThe detective seems to keep his composure but you can tell that he is shaken.\n\t\t\tIt is as if he accepts that someone knows that he did it.\n\t\t\t*goto after_suspects\n\t\t*else\n\t\t\tThe detective angrily retorts, \"I don't know who you are, but you have some nerve accusing me\".\n\t\t\tYou feel that it is not the response of a guilty man.\n\t\t\t*goto after_suspects\n\n\t#The corporation.\n\t\tYou look at the black tower that is the HQ of a mega-corporation.\n\t\tYou find your way back to the 37th floor and find the corporate men that were at your funeral.\n\n\t\tYou whisper, \"Even if you kill me, my code is licensed under the GPL, it can not be kept secret.\"\n\n\t\t*if (murderer = \"corporation\")\n\t\t\tThey look nervously at each other. One stammers, \"You can't tell the source from a binary file can you?\"\n\t\t\tThe other one says \"I don't know, I don't know\".\n\n\t\t\tHmmm, it seems they are not so innocent after all.\n\t\t\t*goto after_suspects\n\n\t\t*else\n\t\t\tYou see them look at each other and laugh. The code is already available for download from our web servers.\n\n\t\t\t\"Oops\", it seems they were doing the right thing after all.\n\t\t\t*goto after_suspects\n\n\t#Your old boss.\n\t\tYou find your old boss sitting at his desk playing solitaire. He seems deep in concentration.\n\n\t\tYou whisper in his ear, \"Project slick, was it really worth killing for?\".\n\n\t\t*if (murderer = \"boss\")\n\t\t\tHe gives a sly smile. \"Interesting, I didn't believe in ghosts... until now.\"\n\t\t\tIf you were not already dead, your are sure that you would feel a shiver down your spine.\n\t\t\t*goto after_suspects\n\t\t*else\n\t\t\tHis eyes grow wide, \"I never thought anything untoward would happen to you.\"\n\t\t\tHe seems frightened and regretful.  You think that he was unlikely to have been involved in your demise.\n\t\t\t*goto after_suspects\n\n\t#Your old colleague.\n\t\tYou find your old colleague, pulling his hair out at your place of work wondering why his screen has turned blue again.\n\t\tYou wonder, could he really have had anything to do with your murder.  Sometimes it is difficult to judge a book by its cover.\n\n\t\tYou will need to make this one extra geeky.\n\t\tYou whisper in his ear, \"Even if you kill me, my ghost lives on in this machine, you cannot get rid of me.\"\n\n\t\t*if (murderer = \"colleague\")\n\t\t\tYou see him turn a shade of white and starts shaking, \"But you are dead, I reformatted your drive, how can this be?\".\n\t\t\tHe has obviously not heard of network storage.\n\t\t\t*goto after_suspects\n\t\t*else\n\t\t\tHe looks puzzled, he picks up his mouse and tries to use it as a microphone.\n\t\t\t\"Computer can you hear me?\", he asks.\n\t\t\tYou wonder how he managed to get a job in the IT department.\n\t\t\tYou doubt he could carry out a murder.\n\t\t\t*goto after_suspects\n\n\t#The man in the gorilla-suit.\n\t\tYou track down the man in the gorilla costume who attended your funeral. You see him sitting by the side of the road in a less than sober state.\n\t\tHe is still muttering \"...best performer...\", \"...agency...\", \"...told him...\".\n\n\t\tYou whisper in his ear, \"Even if you kill me, you will never be the best gorilla-gram, never... NEVER!!!\".\n\n\t\t*if (murderer = \"gorilla-suit\")\n\t\t\tHe bolts upright and snarls, \"Get away from me. I am the best performer... You are dead. You are dead!\".\n\t\t\tYou see the rage and hate seething through his eyes.\n\t\t\t*goto after_suspects\n\t\t*else\n\t\t\tHe breaks down in tears, \"I warned you, I told you that they would kill you. Why didn't you listen to me?\".\n\t\t\tHis ravings become incomprehensible, you wonder if your suspicions are misplaced.\n\t\t\t*goto after_suspects\n\n\n*label label_revenge\nChoose on whom you wish to exact your revenge.\n(Please try to pick the guilty party).\n\n*choice\n\t#The lawyer.\n\t\tYou find the lawyer in his offices looking over various legal documents.\n\t\tHe receives a call on his mobile. He checks the caller and having seen that it is your wife, he begins to look harried.\n\n\t\tTime passes. You watch as the lawyer reluctantly marries your widow.\n\t\tHe reads the marriage speech that she wrote, gets into the car that she picked to go on a honeymoon that she chose\n\t\tin the clothes that she decided on for him. You shudder.\n\t\t*set murderer_guess \"lawyer\"\n\t\t*set murderer_guess_full \"the lawyer\"\n\t\t*goto evaluation\n\n\t#Your widow.\n\t\tYou find your widow lying in the bedroom painting her toenails.\n\n\t\tYou feel that pecuniary punishment will fit the crime given that she murdered you for the money.\n\n\t\tYou remove and destroy the insurance document and the lawyer's copy.\n\t\tYou transfer out all of the savings to various charities using the online banking.\n\t\tGiven the heavy mortgage on the house, the transformation from fortune to financial ruin is complete.\n\t\t*set murderer_guess \"wife\"\n\t\t*set murderer_guess_full \"your wife\"\n\t\t*goto evaluation\n\n\t#Your old girlfriend.\n\t\tYou find your old girlfriend back in her flat resting on the couch.\n\n\t\tYou possess her cat and wander over to her.\n\t\tYou (as the cat) say \"Miaow, I can see the ghost of your old boy friend, miaow\".\n\t\tShe is completely freaked out.\n\t\t*set murderer_guess \"girlfriend\"\n\t\t*set murderer_guess_full \"your girlfriend\"\n\t\t*goto evaluation\n\n\t#The detective.\n\t\tYou find the detective sitting at a desk by the whiteboard in the police station.\n\n\t\tYou ponder your revenge for a long time while observing the detective.\n\n\t\tYou notice that he is the obsessive compulsive type and obsessively collects 80's detective shows on VHS tape.\n\t\t\"Hill Street Blues\", \"Cagney and Lacey\", \"CHIPS\", \"T.J.Hooker\", he has them all.\n\t\tYou overwrite them all with \"Sledgehammer\" and \"Police Squad\".\n\t\t*set murderer_guess \"detective\"\n\t\t*set murderer_guess_full \"the detective\"\n\t\t*goto evaluation\n\n\t#The corporation.\n\t\tYou look at the black tower that is the HQ of a mega-corporation.\n\t\tYou find your way back to the 37th floor and find the corporate men that were at your funeral.\n\n\t\tHow can you take revenge on a faceless corporation?\n\n\t\tWhile you wonder these thoughts, it seems that some bad publicity is rocking the company's public image and its share price.\n\t\tNo doubt the result of their unsavoury practises. Your revenge is accomplished and you did not even have to raise a finger.\n\t\t*set murderer_guess \"corporation\"\n\t\t*set murderer_guess_full \"the corporation\"\n\t\t*goto evaluation\n\n\t#Your old boss.\n\t\tYou find your old boss sitting at his desk playing solitaire. He seems deep in concentration.\n\n\t\tYou ponder your revenge for quite a while.\n\t\tYou think about uninstalling minesweeper from his machine, but such a punishment seems far too light.\n\t\tYou post an insulting description of the CEO from his computer using his facebook page and change the password.\n\t\tThe post gets a lot of attention and the manager is fired shortly after that.\n\t\t*set murderer_guess \"boss\"\n\t\t*set murderer_guess_full \"your old manager\"\n\t\t*goto evaluation\n\n\t#Your old colleague.\n\t\tYou find your old colleague, pulling his hair out at your place of work wondering why his screen has turned blue again.\n\t\tYou wonder could he really have had anything to do with your murder.  Sometimes it is difficult to judge a book by its cover.\n\n\t\tYou see him finding the Windows CDs to reinstall the machine again.\n\t\tYou realise that he is already in Microsoft hell and you need punish him no further.\n\t\t*set murderer_guess \"colleague\"\n\t\t*set murderer_guess_full \"your I.T. colleague\"\n\t\t*goto evaluation\n\n\t#The man in the gorilla-suit.\n\t\tYou track down the man in the gorilla costume who attended your funeral. You see him sitting by the side of the road in a less than sober state.\n\t\tHe is still muttering \"...best performer...\", \"...agency...\", \"...told him...\".\n\n\t\tWith your remaining strength you transform his gorilla-suit into a \"Hello-Kitty\" costume.\n\t\tThis is surely a punishment beyond what is deserved but revenge is yours.\n\t\t*set murderer_guess \"gorilla-suit\"\n\t\t*set murderer_guess_full \"the man in the gorilla-suit\"\n\t\t*goto evaluation\n\n\t#An accident.\n\t\tYou come to the conclusion that your death was accidental.\n\t\tIt was a party, and being a gorilla-gram is an extreme activity.\n\t\tAccidents happen.\n\t\t*set murderer_guess \"accident\"\n\t\t*set murderer_guess_full \"an accident\"\n\t\t*goto evaluation\n\n\n\n*label evaluation\n*page_break\n*if (murderer_guess = murderer)\n\tCongratulations, your correctly identified the murderer and had your revenge.\n\n\tThis is no mean feat as the murderer is randomly determined at the beginning of each game.\n\t*goto label_end\n\n*else\n\tOh dear, you wrongly identified the murderer as ${murderer_guess_full}, the murderer was actually ${murderer_full}.\n\tI guess this means you are going to hell :(\n\n\tWhy not try again? The murderer is randomly determined at the beginning of each game.\n\t*goto label_end\n\n*label label_end\n\nPlease support our work by sharing this game with friends!\nThe more people play, the more resources we'll have to work on the next game.\n*goto_scene ending.choice\n", "ending.choice": "*comment Copyright 2011 by Kie Brooks\n\nGame Over.\n\n*comment *page_break\n*comment Please support our work by sharing this game with friends!\n*comment The more people play, the more resources we'll have to work on the next game.\n\n*page_break End\nWe hope you've enjoyed playing [i]Dead Already?[/i]\n\n*feedback\n\nChoice of Games releases new games like this one on a regular basis.\n*subscribe\n*page_break\n\nThanks for playing!\n\n*ending\n\n", "screenshots": "screenshots\n*script window.animateEnabled = false;\n*page_break\n\n*script changeBackgroundColor(\"sepia\")\n*set recall 10\n*set strength 15\nYour coffin is taken from the main hall and the attendees begin to depart.\n\nEverybody begins to leave.  What are you going to do?\n*fake_choice\n\t#Follow the coffin.\n\t#Wander randomly around the (fairly bleak) landscape.\n\t#Follow one of the people that attended my funeral.\n*script changeBackgroundColor(\"black\")\n*set recall 18\n*set strength 22\nYou are in Starbucks.\n\nYou notice a dishevelled man sitting in the corner in a gorilla suit.  The head of the gorilla costume sits on the seat beside him and he seems to be drinking something from a paper bag which is stronger than the normal caffeine related products served there.\n\n*fake_choice\n\t#Check out the man in the gorilla suit.\n\t#Wait around in Starbucks and enjoy the ambience.\n\t#Leave this coffee house and go somewhere else.\n*script changeBackgroundColor(\"sepia\")\n*set recall 27\n*set strength 34\n\nYou go into the police station past the front desk and look for the detective in\nvestigating your case.\n\nYou wander through the station perusing photos of wanted criminals posted on the walls.  In one room you see a photo of yourself up on a whiteboard with a number of other photos and scribblings.\n\n*fake_choice\n\t#Examine the whiteboard.\n\t#Examine the files on the desk nearby.\n\t#Leave the police station.\n\n*ending", "startup": "*title Dead Already?\n*author Kie Brooks\n\n*comment Copyright 2011 by Kie Brooks\n\n*scene_list\n\tstartup\n\tdead_already_plan.choice\n\tending.choice\n\n\n\n*create recall 0\n*create strength 0\n*create murderer \"\"\n*create murderer_full \"\"\n\n*comment Copyright 2011 by Kie Brooks\n\n*temp recall_name\n*set recall_name false\n*temp lawyer_file\n*set lawyer_file false\n*temp home_visited\n*set home_visited false\n*comment *temp bedroom_photo\n*comment *set bedroom_photo false\n*temp work_place_visited\n*set work_place_visited false\n*temp computer_accessed\n*set computer_accessed false\n*temp project_slick\n*set project_slick false\n*comment *temp project_slick_visited\n*comment *set project_slick_visited false\n*temp insurance_file\n*set insurance_file false\n*temp graveyard_visited\n*set graveyard_visited false\n*temp party_visited\n*set party_visited false\n*comment *temp whiteboard_visited\n*comment *set whiteboard_visited false\n*temp starbucks_visited\n*set starbucks_visited false\n*temp gfhome_visited\n*set gfhome_visited false\n*temp cats_fed\n*set cats_fed false\n\n\n*comment location known?\n*temp graveyard\n*set graveyard false\n*temp home\n*set home false\n*temp gf_home\n*set gf_home false\n*temp lawyer_office\n*set lawyer_office false\n*temp work_place\n*set work_place false\n*temp police_station\n*set police_station false\n*temp corporation\n*set corporation false\n*temp party\n*set party false\n*temp church\n*set church false\n*temp starbucks\n*set starbucks false\n\n*comment people known?\n*temp lawyer\n*set lawyer false\n*temp corporate_types\n*set corporate_types false\n*temp detective\n*set detective false\n*temp boss\n*set boss false\n*temp gorilla\n*set gorilla false\n*temp girlfriend\n*set girlfriend false\n*temp wife\n*set wife false\n*temp colleague\n*set colleague false\n\n*comment who is the murderer?\n*temp die_roll2\n*rand die_roll2 1 9\n*if (die_roll2 = 1)\n\t*set murderer \"lawyer\"\n\t*set murderer_full \"the lawyer\"\n\t*goto first_sentence\n*elseif (die_roll2 = 2)\n\t*set murderer \"wife\"\n\t*set murderer_full \"your wife\"\n\t*goto first_sentence\n*elseif (die_roll2 = 3)\n\t*set murderer \"girlfriend\"\n\t*set murderer_full \"your girlfriend\"\n\t*goto first_sentence\n*elseif (die_roll2 = 4)\n\t*set murderer \"corporation\"\n\t*set murderer_full \"the corporation\"\n\t*goto first_sentence\n*elseif (die_roll2 = 5)\n\t*set murderer \"detective\"\n\t*set murderer_full \"the detective\"\n\t*goto first_sentence\n*elseif (die_roll2 = 6)\n\t*set murderer \"boss\"\n\t*set murderer_full \"your old manager\"\n\t*goto first_sentence\n*elseif (die_roll2 = 7)\n\t*set murderer \"colleague\"\n\t*set murderer_full \"your I.T. colleague\"\n\t*goto first_sentence\n*elseif (die_roll2 = 8)\n\t*set murderer \"gorilla-suit\"\n\t*set murderer_full \"the man in the gorilla-suit\"\n\t*goto first_sentence\n*else\n\t*set murderer \"accident\"\n\t*set murderer_full \"an accident\"\n\t*goto first_sentence\n\n\n*comment random first sentence for more confusion\n*label first_sentence\n*temp die_roll1\n*rand die_roll1 1 5\n*if (die_roll1 = 1)\n\tAnother day, and life is good.... wait a second, is that a coffin over there?\n\t*goto start\n*elseif (die_roll1 = 2)\n\tYou ponder the quote \"Every man dies, few men get to really live\" before your attention is distracted by a coffin.\n\t*goto start\n*elseif (die_roll1 = 3)\n\tYou find yourself crying, but you have forgotten why.  You look up at a coffin in front of you.\n\t*goto start\n*elseif (die_roll1 = 4)\n\tYou hear the words \"May he rest in peace\", and you notice a coffin in front of you.\n\t*goto start\n*elseif (die_roll1 = 5)\n\tYou hear the words \"I can't believe he has gone\".\n\t*goto start\n*else\n\tYour whole body feels strange, it lacks sensation. You wonder why before slowly noticing a coffin.\n\t*goto start\n\n*label start\n\n*if not(choice_is_web or choice_is_steam)\n\t*temp skip_description\n\t*config skip_description false\n\t*if skip_description\n\n\t\t*goto purchased\n*check_purchase adfree\n*if choice_purchase_supported and (not(choice_purchased_adfree) and not(choice_is_web))\n\tThis game is supported by advertisements, but you can buy the unlimited version\n\tto turn off ads forever.\n\n\t*purchase adfree $4.99 purchased\n\t*page_break_advertisement\n\n*label purchased\n\nYou look at the corpse lying in the coffin, the face looks familiar.\n\nYou try to work out who it is, however you are having trouble remembering.\nIt can't be, but it is.  It is you.\n\n\n*label coffin\nYou are dead! You look down on your body in the coffin.\n\n*choice\n\t*disable_reuse #That's not very fair, I only just started playing.\n\t\tLife isn't fair and it seems that death may not be fair either.\n\n\t\tMaybe you should consider why you are still hanging around here.\n\t\t*goto coffin\n\n\t*disable_reuse #Is it game over already? I only just started.\n\t\tNo, it is not 'Game Over', it is only the beginning... of your death.\n\t\t*goto coffin\n\n\t#Look around.\n\t\t*label look_around\n\t\tYou appear to be in some kind of church.\n\t\t*set church true\n\t\tYou survey the guests attending your funeral but you do not recognise any of the faces.\n\t\t*comment\t\tYou see a motley crew assembled at your funeral.\n\t\tFrustratingly you seem to have little or no memory of your (previous) life.\n\n\t\t*choice\n\t\t\t#Wander over to some of the guests and listen in to what they are saying.\n\t\t\t\tWho are you going to wander over to?\n\t\t\t\t*fake_choice\n\t\t\t\t\t*comment \"lawyer\" and \"wife\"\n\t\t\t\t\t#A gentleman dressed in a suit talking to a woman in a black veil.\n\t\t\t\t\t\tThey are discussing a will.  You surmise that the man in the suit is a lawyer and the woman in the black veil, who refers to her late husband most likely was your wife.\n\t\t\t\t\t\t*set lawyer true\n\t\t\t\t\t\t*set wife true\n\n\t\t\t\t\t*comment \"girlfriend\" and \"detective\"\n\t\t\t\t\t#An unshaven man dressed in a trench coat talking to a tearful young woman.\n\t\t\t\t\t\tThe unshaven man is asking the young woman questions and taking notes.\n\t\t\t\t\t\tIt seems that he is a detective and the young woman may have been your girlfriend, sister or perhaps a close friend.\n\n\t\t\t\t\t\tWhy is there a detective here? You wonder how you died.\n\t\t\t\t\t\t*set detective true\n\t\t\t\t\t\t*set girlfriend true\n\n\t\t\t\t\t*comment \"corporation\"\n\t\t\t\t\t#Two men dressed in suits and sunglasses who seem to have distanced themselves from the other guests.\n\t\t\t\t\t\tYou have no idea what their relation with the deceased was, but they seem like corporate types.\n\t\t\t\t\t\t*set corporate_types true\n\n\t\t\t\t\t*comment \"boss\" and \"colleague\"\n\t\t\t\t\t#An overweight man dressed in a suit and a nerdy looking younger man in a shirt and jeans.\n\t\t\t\t\t\tThe overweight man berates the younger man for some reason or other and is complaining about some lost research.\n\t\t\t\t\t\tYou guess that this may have been your boss and a colleague.\n\t\t\t\t\t\t*set boss true\n\t\t\t\t\t\t*set colleague true\n\n\t\t\t\t\t*comment \"gorilla-suit\"\n\t\t\t\t\t#A man sitting by himself dressed in a gorilla suit.\n\t\t\t\t\t\tYou float over to the man dressed in the gorilla suit. The head of his tattered costume sits by his side and he is mumbling to himself.\n\t\t\t\t\t\tYou can barely make out what he is saying but you manage to catch a few words, \"...best performer...\", \"...agency...\", \"...told him...\".\n\n\t\t\t\t\t\tIt appears that these are his work clothes, and that your funeral is not a fancy dress party.\n\t\t\t\t\t\t*set gorilla true\n\n\t\t\t\t*goto leaving_funeral\n\n\t\t\t#Try to attract attention.\n\t\t\t\tNobody seems to notice you and you seem unable to interact with the physical world.\n\n\t\t\t\t*goto leaving_funeral\n\n\t\t\t*disable_reuse #Try to reinhabit your body.\n\t\t\t\tHmmm, it doesn't seem to work like in the films.\n\t\t\t\tYour old body is inanimate.\n\n\t\t\t\t*goto look_around\n\n*label leaving_funeral\nYour coffin is taken from the main hall and the attendees begin to depart.\n\nEverybody begins to leave.\nWhat are you going to do?\n*choice\n\t#Follow the coffin.\n\t\t*comment You remain with your corpse.  The undertaker closes the lid of the coffin.  Your coffin is buried in the graveyard.\n\t\t*label graveyard\n\t\tYour coffin is buried in the graveyard at the back of the church.\n\t\t*set graveyard true\n\n\t\tAbove your grave is a small black tombstone.\n\t\t*line_break\n\t\tIt reads: Gregor Polinchovitch, R.I.P.\n\n\t\tDamn it, they even misspelled your name.\n\t\t*if (graveyard_visited = false)\n\t\t\t*set recall +15\n\t\t\t*set recall_name true\n\t\t\t*set graveyard_visited true\n\t\t\t*set strength +20\n\t\t\tYou feel angry and seemed to have gained a little strength to interact with the living world.\n\n\t\t\tIn addition you remember your name and you gain some memory of your previous life.\n\n\t\t\t*goto location_choice\n\t\t*goto location_choice\n\n\n\t#Wander randomly around the (fairly bleak) landscape.\n\t\tYou drift this way and then drift that way.\n\n\t\tYou are bored.  An eternity like this would drive you crazy.\n\t\tYou determine to find out about your past life so that you may rest in peace.\n\n\t\t*goto location_choice\n\n\n\t#Follow one of the people that attended my funeral.\n\t\tWho are you going to follow?\n\t\t*choice\n\t\t\t*comment \"lawyer\" and \"wife\"\n\t\t\t*if (lawyer)\n\t\t\t\t#The lawyer.\n\t\t\t\t\tYou follow the lawyer to his office.\n\t\t\t\t\t*goto lawyer_office\n\t\t\t*else\n\t\t\t\t#The gentleman dressed in a sharp suit.\n\t\t\t\t\tYou follow him to an office building.\n\t\t\t\t\tIt seems that he was your lawyer.\n\t\t\t\t\t*set lawyer true\n\t\t\t\t\t*goto lawyer_office\n\n\t\t\t*if (wife)\n\t\t\t\t#My wife.\n\t\t\t\t\tYou follow your widow back to her home.\n\t\t\t\t\t*goto home\n\t\t\t*else\n\t\t\t\t#The woman in a black veil.\n\t\t\t\t\tYou follow the woman back to her home.\n\t\t\t\t\t*goto home\n\n\t\t\t*comment \"girlfriend\" and \"detective\"\n\t\t\t*if (detective)\n\t\t\t\t#The detective.\n\t\t\t\t\tYou follow the detective back to the police station.\n\t\t\t\t\t*goto police_station\n\t\t\t*else\n\t\t\t\t#The unshaven man dressed in a trench coat.\n\t\t\t\t\tYou follow the man back to the police station. He is probably a detective.\n\t\t\t\t\t*set detective true\n\t\t\t\t\t*goto police_station\n\n\t\t\t*if (girlfriend)\n\t\t\t\t#The upset girl.\n\t\t\t\t\tYou follow the attractive girl back to her home.\n\t\t\t\t\t*goto gf_home\n\t\t\t*else\n\t\t\t\t#The tearful young woman.\n\t\t\t\t\tYou follow the young woman back to her home.\n\t\t\t\t\t*goto gf_home\n\n\t\t\t*comment \"corporation\"\n\t\t\t*if (corporate_types)\n\t\t\t\t#The corporate men.\n\t\t\t\t\tYou follow the corporate men back to some offices.\n\t\t\t\t\t*goto corporation\n\t\t\t*else\n\t\t\t\t#The two men dressed in suits and sunglasses.\n\t\t\t\t\tYou follow the men back to some offices.\n\t\t\t\t\t*goto corporation\n\n\t\t\t*comment \"boss\" and \"colleague\"\n\t\t\t*if (boss)\n\t\t\t\t#Your old boss and colleague.\n\t\t\t\t\tYou follow your boss and colleague back to their work place.\n\t\t\t\t\t*goto work_place\n\t\t\t*else\n\t\t\t\t#The overweight man and the nerdy looking man.\n\t\t\t\t\tYou follow the men back to some buildings.\n\t\t\t\t\t*goto work_place\n\n\t\t\t*comment \"priest\"\n\t\t\t#The priest.\n\t\t\t\tYou follow the priest in to a small room at the back of the church.\n\t\t\t\t*goto church\n\n\t\t\t*comment \"gorilla-suit\"\n\t\t\t*if (gorilla)\n\t\t\t\t#The gorilla-gram.\n\t\t\t\t\tYou follow the gorilla-gram to a residential house.\n\t\t\t\t\t*goto party\n\t\t\t*else\n\t\t\t\t#The man dressed in a gorilla suit.\n\t\t\t\t\tYou follow the man to a residential house.\n\t\t\t\t\t*goto party\n\n\n*label location_choice\nWhere to now?\n*choice\n\t*if (church)\n\t\t#Church.\n\t\t\tYou wander back to the church, the somber scene of your funeral.\n\t\t\t*goto church\n\t*if (graveyard)\n\t\t#Graveyard.\n\t\t\tYou go to the graveyard.\n\t\t\t*goto graveyard\n\t*if (home)\n\t\t#Wife's home.\n\t\t\tYou go to your widow's house.\n\t\t\t*goto home\n\t*if (gf_home)\n\t\t#Girlfriend's home.\n\t\t\tYou go to your girlfriend's house.\n\t\t\t*goto gf_home\n\t*if (lawyer_office)\n\t\t#Lawyer's offices.\n\t\t\tYou go to the lawyer's offices.\n\t\t\t*goto lawyer_office\n\t*if (work_place)\n\t\t#Work place.\n\t\t\tYou visit your old work place.\n\t\t\t*goto work_place\n\t*if (police_station)\n\t\t#Police station.\n\t\t\tYou go to the police station.\n\t\t\t*goto police_station\n\t*if (party)\n\t\t#Residential address.\n\t\t\tYou go to a house in the suburbs.\n\t\t\t*goto party\n\t*if (corporation)\n\t\t#Corporate headquarters.\n\t\t\tYou go to the offices of Techroid Inc.\n\t\t\t*goto corporation\n\t*if (starbucks)\n\t\t#Starbucks.\n\t\t\tYou go to the local coffee house.\n\t\t\t*goto starbucks\n\t*selectable_if (recall > 69) #Enough wandering, I know enough to form a plan.\n\t\t*goto_scene dead_already_plan.choice\n\n*comment work out why, how you died perhaps so that you can rest in peace\n*comment very limited physical interaction, but will improve as progress in the game.\n*comment find out how died and do something to remedy it so that your soul can rest in peace.\n\n*label home\n*set home true\n*if (home_visited = false)\n\t*set home_visited true\n\t*set recall +10\n\t*goto home_visited_endif\n*label home_visited_endif\nYou look around your house, it seems familiar and you vaguely remember having lived there.\n\n*if (wife)\n\tIn the hall you see an old wedding photo of yourself and your wife (now your widow).\n\t*goto wife_endif\n*else\n\tIn the hall you see an old wedding photo of yourself and the woman who was wearing the black veil.  She must have been your wife (now your widow).\n\t*set wife true\n\t*goto wife_endif\n\n*label wife_endif\nThere is some mail on a small table by the phone.\n\n*label label_home_choice1\n*choice\n\t*disable_reuse #Look around the whole house.\n\t\tYou wander around the house trying to remember what once was.\n\n\t\t*if (lawyer)\n\t\t\tIn the bedroom you notice a picture of your wife and the lawyer.\n\t\t\tHe is clearly providing more than legal services.\n\t\t\tIt also gives him a motive to get rid of you.\n\t\t\t*goto label_home_endif\n\n\t\t*else\n\t\t\tIn the bedroom you notice a picture of your wife and another man.\n\t\t\tYou recognise him as the man that was talking to your wife at the funeral.\n\t\t\t*goto label_home_endif\n\n\t\t*label label_home_endif\n\t\tYou feel angry and knock the photo over.\n\t\tOh, you seem to have gained a little strength to interact with the living world.\n\t\t*set strength +20\n\t\t*goto label_home_choice1\n\n\t*if (strength \u003c 40) #Look through the mail.\n\t\tTry as you might you are unable to move the letters.\n\t\tYou feel that you could accomplish this if you were stronger, but you are too weak.\n\n\t\tYou can however see the return address which is printed on the uppermost letter, it is the address of a law firm.\n\n\t\t*set lawyer_office true\n\t\t*goto label_home_choice1\n\n\t*if (strength > 39)\n\t\t*disable_reuse #Look through the mail.\n\t\t\tYou look through the mail, junk, junk, reader's digest...\n\t\t\tA letter from a law firm confirming receipt of documents addressed to your wife,\n\t\t\ta letter from a company where you must have worked detailing some change to your pension fund\n\t\t\tand a party invitation; wait, it's actually a job at a party.\n\n\t\t\tDid you have two jobs?\n\t\t\tYou make a mental note of the addresses.\n\t\t\t*set lawyer_office true\n\t\t\t*set party true\n\t\t\t*set work_place true\n\t\t\t*goto label_home_choice1\n\n\t#Leave the house.\n\t\tYou leave your old home.\n\n\t\t*goto location_choice\n\n\n*label lawyer_office\n*set lawyer_office true\nThe building is marked \"Lamniformes & Co. Attorneys\".\n\n*if (lawyer = false)\n\tYou recognise the man that was talking to your wife at the funeral.  He must have been your lawyer.\n\t*set lawyer true\n\n*label label_lawyer_office\nThe lawyer goes in and out of his office, conducting his day to day business.\nHis room is filled with client files and some legal books.\n\n*if (recall_name)\n\tYou see a file on his desk marked with your name.\n\t*choice\n\t\t*if (strength > 39)\n\t\t\t*disable_reuse #Look through the file.\n\t\t\t\tYou peruse your file when the lawyer is not in the room.\n\t\t\t\tIt seems that your wife was due to receive an insurance payout on your death.\n\t\t\t\tYou notice that none of the documents have your signature, only the signature of your wife.\n\t\t\t\tYou note the address of the claimant.\n\t\t\t\t*set home true\n\n\t\t\t\tYour widow might be innocent but she also had motive to kill you.  The lawyer could possibly be involved too.\n\t\t\t\t*if (insurance_file = false)\n\t\t\t\t\tYou feel angry at the betrayal.\n\t\t\t\t\tYou seem to have gained more strength to interact with the living world.\n\t\t\t\t\t*set strength +20\n\t\t\t\t\t*set insurance_file true\n\t\t\t\t\t*goto label_lawyer_office\n\n\t\t\t\t*goto label_lawyer_office\n\n\t\t*if (strength \u003c 40) #Look through the file.\n\t\t\tTry as you might you are unable to open the folder.\n\t\t\tYou feel that you could accomplish this if you were stronger, but you are so weak.\n\t\t\t*goto label_lawyer_office\n\n\t\t#Leave the office.\n\t\t\tYou leave the lawyer's offices.\n\t\t\t*goto location_choice\n\n*goto location_choice\n\n\n\n*label work_place\n*set work_place true\n*if (work_place_visited = false)\n\t*set work_place_visited true\n\t*set recall +5\n\t*goto work_place_visited_endif\n\n*label work_place_visited_endif\nYou look at the glass fronted doors of Techroid Inc.\nYou drift through the glass doors past reception and into cubicle-ville.\nThe layout seems familiar and you find yourself being drawn to a cubicle and what may have been your old desk.\n\n*if (boss)\n\tYour old manager is haranging your old work colleague.\n\t*goto boss_endif\n*else\n\tThe unkempt young man is staring in a confused state at the screen while a sweaty manager harangs him.\n\tThe scruffy man you recall was your colleague and his boss was your boss.\n\t*set boss true\n\t*set colleague true\n\t*goto boss_endif\n*label boss_endif\n\nWhy are they sitting at your cubicle and what is all the fuss about.\nYou look at the screen, what on earth is that?  You are filled with revulsion as you see that your old screen now has the flavour of Microsoft windows.\nThey are trying to find something that you were working on, but you can not recall what it was.\n\n*label work_place_choice\nNow that you are settled back in your old work place (albeit in a ghostly ethereal form), what do you want to do?\n*fake_choice\n\t*if (strength > 19)\n\t\t#Sit down at an empty cubicle and try to login.\n\t\t\tYou type in your login and password, which appear to still be working.\n\t\t\t*if (computer_accessed = false)\n\t\t\t\t*set computer_accessed true\n\t\t\t\t*set recall +5\n\t\t\t\t*goto computer_accessed_endif\n\t\t\t*label computer_accessed_endif\n\t\t\t*goto label_workplace_login\n\n\t*if (strength \u003c 20) #Sit down at an empty cubicle and try to login.\n\t\tTry as you might you are unable to press the keys.\n\t\tYou feel that you could accomplish this if you were stronger, but you are too weak at the moment.\n\t\t*goto work_place_choice\n\n\t*if (computer_accessed)\n\t\t*disable_reuse #Have some fun with your old colleagues.\n\t\t\tYou decide to change the login motd (message of the day).\n\n\t\t\t\"A sysadmin message from beyond the grave: windows users you are going to hell, convert to linux before it is too late!\".\n\n\t\t\tYou were never very good at coming up with practical jokes.\n\t\t\tThey probably won't even read it, they never did when you were alive.\n\n\t\t\t*goto work_place_choice\n\n\t#Time to leave the office.\n\t\tYou decide not to spend any more time at your old work place, it was bad enough when you were alive.\n\t\t*goto location_choice\n\n\n*label  label_workplace_login\n*choice\n\t*disable_reuse #Check your backup server.\n\t\tYou remember your backup server details but little else, you browse around to find what you were working on.\n\t\tYou find game files. A game? That makes no sense. You do not remember working on a game.\n\t\t*goto label_workplace_login\n\n\t#Check your email.\n\t\tYou decide to check your email, that should answer some questions.\n\n\t\tHmmm, it looks like everything was deleted by a script... ah yes written by you.\n\t\tWell you can be forgiven for not anticipating this set of circumstances.\n\n\t\tOh wait you just received a new message, perhaps you are in luck after all.\n\n\t\t*page_break\n\n\t\tThe email reads\n\t\t*temp die_roll_email\n\t\t*rand die_roll_email 1 4\n\t\t*if (die_roll_email = 1)\n\t\t\t\"Enlarge your member\".\n\t\t\t*goto delete_email\n\t\t*if (die_roll_email = 2)\n\t\t\t\"Get a degree without study\".\n\t\t\t*goto delete_email\n\t\t*if (die_roll_email = 3)\n\t\t\t\"A barrister from Nigeria wishes to transfer 14.5 million dollars to your account\".\n\t\t\t*goto delete_email\n\t\t*if (die_roll_email = 4)\n\t\t\t\"Buy a genuine fake rolex\".\n\t\t\t*goto delete_email\n\n\t\t*label delete_email\n\t\tYou curse all spammers and delete the email.\n\t\t*goto label_workplace_login\n\n\t*disable_reuse #Check someone else's computer.\n\t\tYou take a quick peek at your bosses computer screen.\n\t\tHmmm, an email from his boss demanding the status on project \"Slick\",\n\t\tand you thought he only used his computer for playing minesweeper.\n\t\t*set project_slick true\n\t\t*goto label_workplace_login\n\n\t#Logout.\n\t\tYou logout\n\t\t*goto work_place_choice\n\n*label police_station\n*set police_station true\nYou go into the police station past the front desk and look for the detective investigating your case.\n\nYou wander through the station perusing photos of wanted criminals posted on the walls.\nIn one room you see a photo of yourself up on a whiteboard with a number of other photos and scribblings.\n\n*label label_police_choice\n*choice\n\t*disable_reuse #Examine the whiteboard.\n\t\tYou carefully examine the whiteboard.\n\t\tYou recognise the other photos on the board as being from the funeral.\n\t\tThis detective seems to have potential.\n\n\t\tAs you look at the names and faces, you remember a little more of your past.\n\t\t*set recall +5\n\n\t\tYou read the notes. Hmmm, it seems that everyone at your funeral had a motive to kill you,\n\t\tincluding your lawyer, widow, girlfriend, a large conglomerate, your firm and your colleagues.\n\t\tWhat a popular fellow you must have been.\n\t\tAlso why did you have both a wife and a girlfriend?\n\t\t*set wife true\n\t\t*set lawyer true\n\t\t*set corporate_types true\n\t\t*set detective true\n\t\t*set boss true\n\t\t*set colleague true\n\t\t*set detective true\n\n\t\t*goto label_police_choice\n\n\t*if (strength > 39)\n\t\t*disable_reuse #Examine the files on the desk nearby.\n\t\t\tYou look through the files on the desk.\n\t\t\tThings might have just become a lot easier...\n\n\t\t\t*page_break\n\t\t\tWhat? None of the files relate to this case.\n\t\t\tPerhaps the detective on the case took the files with him.\n\n\t\t\t*goto label_police_choice\n\n\t*if (strength \u003c 40) #Examine the files on the desk nearby.\n\t\tUnfortunately you do not seem to be able to open the files.\n\t\tYou feel that you could accomplish this if you were stronger, but you are too weak.\n\n\t\t*goto label_police_choice\n\n\t#Leave the police station.\n\t\tNo bars can hold you now.\n\t\t*goto location_choice\n\n\n*label party\n*set party true\nYou arrive at a terraced house which has two partially deflated balloons attached to the front door.\nIt must have been the venue for a party.\n\nYou survey the 'after-party' which is not pretty.\nThere are party streamers, crushed beer cans and half empty beer bottles.\nCigarette butt ends, burns in the carpets, various vomit and other stains.\n\nMore chilling are the blood stains and chalk outline in the middle of the living room.\nYou wonder if this was the scene of your death.\n\n*label party_choice\n*choice\n\t*disable_reuse #Search the post apocalyptic scene.\n\t\tYou notice that there is a sign on the wall.\n\n\t\tCRIME SCENE DO NOT DISTURB.\n\t\tIf you have information relating to the events that took place please contact the detective in charge at the station.\n\n\t\tYou wonder why you did not notice that when you first came in.\n\t\t*set police_station true\n\t\t*goto party_choice\n\n\t*if (police_station)\n\t\t*disable_reuse #Carefully search for clues.\n\t\t\tJudging by the blood stains and the chalk outline, you did not have  natural death.\n\t\t\tMaybe there will be more in the police report.\n\n\t\t\tYou notice some tufts of blue material in the dried blood stains.\n\t\t\t*if (gorilla)\n\t\t\t\tYou recognise the colour and material as belonging to a gorilla suit.\n\t\t\t\t*if (party_visited = false)\n\t\t\t\t\t*set recall +5\n\t\t\t\t\t*goto label_gorilla_recognised\n\t\t\t\t*goto label_gorilla_recognised\n\n\t\t\t*else\n\t\t\t\tThe colour and material seem vaguely familiar but you can not put your finger on it.\n\t\t\t\t*goto label_gorilla_recognised\n\n\t\t\t*label label_gorilla_recognised\n\t\t\t*if (party_visited = false)\n\t\t\t\t*set recall +5\n\t\t\t\t*set party_visited true\n\t\t\t\t*goto party_choice\n\n\t\t\t*goto party_choice\n\n\t#Leave the house.\n\t\tYes, this party is long since over, time to leave.\n\t\t*goto location_choice\n\n\n*label church\n*set church true\nThe church is quiet and peaceful.\n*if (graveyard = false)\n\t*set graveyard true\n\tYou notice some doors that lead into a graveyard.\n\nYou wander around through the main hall and then go into a back room, where you see the priest.\n*line_break\nThe priest is drinking from a silver hip flask and muttering to himself in a very disconcerting manner.\n\n*label church_choice\n*choice\n\t*disable_reuse #Listen to the priest.\n\t\t\"Remember his funeral yes, but not my birthday\"... grumble, grumble, \"bloody atheists\"...\n\t\tmumble, mumble, \"witch burning\"... mutter, mutter, \"tea and biscuits\"...\n\n\t\tYou tune out his rantings.\n\t\t*goto church_choice\n\n\t*if (recall_name = false) #Search the little room.\n\t\t*if (starbucks = false)\n\t\t\t*set starbucks true\n\t\t\tYou see an old voucher for Starbucks, which lies unused.\n\t\t\tYou wish that you had used your stamped coffee coupons while you were still alive.\n\t\t\t*goto endif_coupon\n\t\t*label endif_coupon\n\n\t\tYou see a lot of papers on his desk including hyms, and notes for sermons.\n\t\t*line_break\n\t\tThey are so boring that you can not bring yourself to look through them all.\n\n\t\t*goto church_choice\n\n\n\t*if (recall_name)\n\t\t*disable_reuse #Search the little room.\n\t\t\t*if (starbucks = false)\n\t\t\t\t*set starbucks true\n\t\t\t\tYou see an old voucher for Starbucks, which lies unused.\n\t\t\t\tYou wish that you had used your stamped coffee coupons while you were still alive.\n\t\t\t\t*goto label_desk_continue\n\t\t\t*label label_desk_continue\n\n\t\t\tAmong the papers on his desk you see a copy of your death certificate along with an invoice for the funeral.\n\t\t\tYou make a mental note of the address.\n\t\t\t*set home true\n\t\t\t*goto church_choice\n\n\t#Leave the church.\n\t\t*goto location_choice\n\n\n*label starbucks\n*set starbucks true\n\nYou are in Starbucks.\n*if (starbucks_visited = false)\n\tAmazingly the strong smell of caffeine gives you a boost even despite the fact that you are dead.\n\tYou feel slightly stronger.\n\t*set strength +10\n\t*set starbucks_visited true\n\n*label starbucks_choice\nYou notice a dishevelled man sitting in the corner in a gorilla suit.\nThe head of the gorilla costume sits on the seat beside him and he seems to be drinking something from a paper bag\nwhich is stronger than the normal caffeine related products served there.\n*set gorilla true\n\n*choice\n\t*if (party = false) #Check out the man in the gorilla suit.\n\t\t*goto label_gorilla_check\n\n\t*if (party)\n\t\t*disable_reuse #Check out the man in the gorilla suit.\n\t\t\t*label label_gorilla_check\n\t\t\tHe seems fairly unhappy, less than sober and smells bad (the warm gorilla suit probably does not help).\n\t\t\tEven as a ghost, you decide to keep your distance.\n\n\t\t\tAfter a while the man in the gorilla suit leaves.\n\t\t\t*choice\n\t\t\t\t*disable_reuse #Follow him.\n\t\t\t\t\tYou follow the costumed man to a residential house.\n\t\t\t\t\t*goto party\n\n\t\t\t\t#Wait around in Starbucks and enjoy the ambience.\n\t\t\t\t\t*label label_coffee_house_wait\n\t\t\t\t\tYou hang around in Starbucks.\n\n\t\t\t\t\t*comment see if anyone else turns up\n\t\t\t\t\t*temp die_roll3\n\t\t\t\t\t*rand die_roll3 1 6\n\n\t\t\t\t\t*comment lessen the occurence of extra unnecessary events and increase the odds of beneficial ones.\n\t\t\t\t\t*if (lawyer_office) and (die_roll3 = 1)\n\t\t\t\t\t\t*set die_roll3 2\n\t\t\t\t\t\t*goto label_die_roll3\n\t\t\t\t\t*if (gf_home) and (die_roll3 = 2)\n\t\t\t\t\t\t*set die_roll3 3\n\t\t\t\t\t\t*goto label_die_roll3\n\t\t\t\t\t*if (corporation) and (die_roll3 = 3)\n\t\t\t\t\t\t*set die_roll3 1\n\t\t\t\t\t\t*goto label_die_roll3\n\n\t\t\t\t\t*label label_die_roll3\n\t\t\t\t\t*if (die_roll3 = 1) and (lawyer_office = false)\n\t\t\t\t\t\tAmong the customers, you see a smartly dressed man walk in and order an overpriced caffeine beverage.\n\t\t\t\t\t\tYou remember that he was talking to a woman with a black veil at your funeral.\n\t\t\t\t\t\t*choice\n\t\t\t\t\t\t\t*disable_reuse #Follow the man when he leaves.\n\t\t\t\t\t\t\t\tYou follow the man in the sharp suit back to a glass fronted building.\n\t\t\t\t\t\t\t\t*goto lawyer_office\n\t\t\t\t\t\t\t#Remain in the coffee house.\n\t\t\t\t\t\t\t\t*goto label_coffee_house_wait\n\t\t\t\t\t*elseif (die_roll3 = 2) and (gf_home = false)\n\t\t\t\t\t\tAmong the customers, you notice a young woman enter and sit down at a table.\n\t\t\t\t\t\tYou remember that she was at your funeral and very upset at the time.\n\t\t\t\t\t\t*choice\n\t\t\t\t\t\t\t*disable_reuse #Follow her when she leaves.\n\t\t\t\t\t\t\t\tYou follow her back to a small flat.\n\t\t\t\t\t\t\t\t*goto gf_home\n\t\t\t\t\t\t\t#Remain in the coffee house.\n\t\t\t\t\t\t\t\t*goto label_coffee_house_wait\n\t\t\t\t\t*elseif (die_roll3 = 3) and (corporation = false)\n\t\t\t\t\t\tAmong the customers, you see two men in suits and dark glasses.  You recognise them from your funeral.\n\t\t\t\t\t\t*choice\n\t\t\t\t\t\t\t*disable_reuse #Follow them when they leave.\n\t\t\t\t\t\t\t\tYou follow the men back to a large marble fronted sky-scraper.\n\t\t\t\t\t\t\t\t*goto corporation\n\t\t\t\t\t\t\t#Remain in the coffee house.\n\t\t\t\t\t\t\t\t*goto label_coffee_house_wait\n\t\t\t\t\t*else\n\t\t\t\t\t\t*if (gf_home) and ((lawyer_office) and (corporation))\n\t\t\t\t\t\t\tYou don't think that you are going to see anybody else interesting turn up here.\n\t\t\t\t\t\t\tMaybe it is time to leave.\n\t\t\t\t\t\t\t*goto label_starbucks_wait_choice\n\t\t\t\t\t\t*else\n\t\t\t\t\t\t\tYou wait and you wait.\n\t\t\t\t\t\t\tCustomers come and go, coffee is drunk and money is exchanged.\n\t\t\t\t\t\t\t*goto label_starbucks_wait_choice\n\n\t\t\t\t#Leave the house of caffeine.\n\t\t\t\t\tYou leave the coffee house to seek other pastures.\n\t\t\t\t\t*goto location_choice\n\n\t*if (gf_home) and ((lawyer_office) and (corporation))\n\t\t*disable_reuse #Wait around in Starbucks and enjoy the ambience.\n\t\t\tYou don't think that you are going to see anybody else interesting turn up here.\n\t\t\tMaybe it is time to leave.\n\t\t\t*goto label_starbucks_wait_choice\n\t*else\n\t\t#Wait around in Starbucks and enjoy the ambience.\n\t\t\t*goto label_coffee_house_wait\n\n\t#Leave this coffee house and go somewhere else.\n\t\tYou leave Starbucks as you can no longer slouch in the comfy sofas there.\n\t\t*goto location_choice\n\n\n*label label_starbucks_wait_choice\nWhat now?\n*choice\n\t#Keep waiting.\n\t\t*goto label_coffee_house_wait\n\t#Leave.\n\t\tNauseated by the intense smell of coffee, you leave.\n\t\t*goto location_choice\n\n\n\n*label corporation\n*set corporation true\nThis building looks like a modern castle, it is a huge black marble covered office tower.\nYou float through security and follow the men up to the 37th floor.\n\n*label corporation_choice\nTwo corporate types complain about the coffee in the vending machine and talk about Saturday's game.\nYou see some unattended computer terminals.\n*choice\n\t*if ((strength > 19) and (project_slick))\n\t\t*disable_reuse #Check out the computer terminals.\n\t\t\tYou find the login details conveniently noted on a post it on the side of the monitor.\n\n\t\t\tYou notice a folder named \"slick\" on a shared network drive.\n\t\t\tYou remember seeing this name at your old workplace as well.\n\n\t\t\tYou look in the folder and recognise... your code.\n\n\t\t\t*set recall +15\n\t\t\t*set strength +10\n\t\t\tYou recall some parts of your past life and gain a little strength to further interact with the world.\n\n\t\t\tYour code was for the controller mechanism for a part of a small fuel cell.\n\t\t\tNot revolutionary nor (unfortunately) even finished.\n\n\t\t\tYou wonder why it is now on the network drive at this company and no longer at your previous place of employment.\n\n\t\t\t*goto corporation_choice\n\n\t*if ((strength > 19) and (project_slick = false)) #Check out the computer terminals.\n\t\tYou look around the network and find a bunch of projects and internal memos.\n\t\tIt is really boring, you don't recognise anything familiar.\n\n\t\t*goto corporation_choice\n\n\t*if (strength \u003c 20) #Check out the computer terminals.\n\t\tTry as you might you are unable to press the keys.\n\t\tYou feel that you could accomplish this if you were stronger, but you are too weak at the moment.\n\n\t\t*goto corporation_choice\n\n\t*disable_reuse #Look around the rest of the building.\n\t\tYou wander around the different floors. The building is full of suited men and women who seem to spend their time complaining.\n\n\t\t*goto corporation_choice\n\n\t#Leave the building.\n\t\tElvis has left the building.\n\n\t\t*goto location_choice\n\n\n*label gf_home\n*set gf_home true\nYou enter a small but homely flat.\n\n*if  (gfhome_visited = false)\n\t*set gfhome_visited true\n\t*set recall +15\n\t*set strength +20\n\tYou recall more of your past life and feel that you have a little more strength to interact with the world around you.\n\t*goto endif_gfvisited\n*label endif_gfvisited\n\n*if (cats_fed)\n\tYou see that your two cats are still there. They look happy.\n\t*goto flat_choice\n*else\n\tYou hear the miaowing of your two cats. They look hungry.\n\t*goto flat_choice\n\n*label flat_choice\n*choice\n\t*disable_reuse #Look around the flat.\n\t\tYou recall some fond memories spent in the flat.\n\t\tYou wander in to the bedroom and see a photo of your old girlfriend with the detective that was at your funeral.\n\n\t\tYou are shocked. Is the detective a friend of hers, a relative, or was she seeing him as well?\n\t\t*goto flat_choice\n\t*if (cats_fed)\n\t\t*disable_reuse #Feed the cats.\n\t\t\tThe cats greedily devour the food.  Be careful you don't feed them too much or they will get fat.\n\t\t\t*goto flat_choice\n\n\t*if (cats_fed = false) #Feed the cats.\n\t\t*if (strength > 60)\n\t\t\tYou feed the cats, they do not complain about being fed by a ghost.\n\t\t\t*label cats_fed_endif\n\t\t\t*set cats_fed true\n\t\t\t*goto flat_choice\n\t\t*else\n\t\t\tYou are too weak to interact so much with the physical world and feed the cats.  If only you were a bit stronger.\n\t\t\t*goto flat_choice\n\n\t#Leave the flat.\n\t\tYou reluctantly leave the flat.\n\t\t*goto location_choice\n\n"}};
+</script>
+<script>
+/* ChoiceScript runtime — vanilla-JS port of the Python engine in cs/.
+ *
+ * Faithful reimplementation of parser + expr + interpolate + engine. The
+ * engine is I/O-agnostic: it talks to an `io` object exposing text(), choose(),
+ * page_break(), input_text(), input_number(), achievement(), stat_chart().
+ *
+ * Exposed as a global `CS` object (no modules, no build step).
+ */
+(function (root) {
+  "use strict";
+
+  // ---- errors ----------------------------------------------------------- //
+
+  class CSError extends Error {
+    constructor(message, scene, line) {
+      super(formatLoc(scene, line) + message);
+      this.raw_message = message;
+      this.scene = scene === undefined ? null : scene;
+      this.line = line === undefined ? null : line;
+      this.name = "CSError";
+    }
+  }
+  function formatLoc(scene, line) {
+    if (scene == null && line == null) return "";
+    return (scene == null ? "?" : scene) + " line " + (line == null ? "?" : line) + ": ";
+  }
+  class ExprError extends CSError { constructor(m, s, l) { super(m, s, l); this.name = "ExprError"; } }
+  class GameOver extends Error { constructor(label) { super(label || ""); this.label = label || ""; this.name = "GameOver"; } }
+  class QuitGame extends Error { constructor() { super("quit"); this.name = "QuitGame"; } }
+  class LoadGame extends Error { constructor(state) { super("load game"); this.state = state; this.name = "LoadGame"; } }
+  class RestartGame extends Error { constructor() { super("restart"); this.name = "RestartGame"; } }
+
+  // ---- parser ----------------------------------------------------------- //
+
+  const COMMAND_RE = /^\s*\*(\w+)\b[ \t]?([\s\S]*)$/;
+  const INDENT_RE = /^([ \t]*)/;
+
+  class Line {
+    constructor(num, indent, command, arg, text) {
+      this.num = num;
+      this.indent = indent;
+      this.command = command; // null for plain text
+      this.arg = arg;
+      this.text = text;
+    }
+    get is_blank() {
+      return this.command == null && this.text.trim() === "";
+    }
+  }
+
+  function getIndent(raw) {
+    const m = INDENT_RE.exec(raw);
+    const ws = m ? m[1] : "";
+    if (ws.indexOf("\t") !== -1 && ws.indexOf(" ") !== -1) {
+      throw new CSError("mixed tabs and spaces in indentation");
+    }
+    return ws.length;
+  }
+
+  function parseScene(text) {
+    const lines = [];
+    const rawLines = text.split("\n");
+    for (let i = 0; i < rawLines.length; i++) {
+      let raw = rawLines[i].replace(/\r$/, "");
+      const num = i + 1;
+      if (raw.trim() === "") {
+        lines.push(new Line(num, 0, null, "", ""));
+        continue;
+      }
+      const indent = getIndent(raw);
+      const m = COMMAND_RE.exec(raw);
+      if (m) {
+        lines.push(new Line(num, indent, m[1], m[2], raw.trim()));
+      } else {
+        lines.push(new Line(num, indent, null, "", raw.trim()));
+      }
+    }
+    return lines;
+  }
+
+  // ---- value coercion --------------------------------------------------- //
+
+  function isNum(v) { return typeof v === "number"; }
+  function isBool(v) { return typeof v === "boolean"; }
+  function isStr(v) { return typeof v === "string"; }
+
+  function toNum(value) {
+    if (isBool(value)) throw new ExprError("Expected number, got boolean: " + value);
+    if (isNum(value)) return value;
+    const s = String(value).trim();
+    if (/^-?\d+$/.test(s)) return parseInt(s, 10);
+    // Match Python float(): the whole string must be a valid float literal.
+    if (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s)) {
+      const f = Number(s);
+      if (!isNaN(f)) return f;
+    }
+    throw new ExprError('Expected number, but got string: "' + value + '"');
+  }
+
+  function toBool(value) {
+    if (isBool(value)) return value;
+    if (isNum(value)) throw new ExprError("Expected boolean, got number: " + value);
+    const s = String(value).trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+    throw new ExprError('Expected boolean, but got string: "' + value + '"');
+  }
+
+  function csStr(value) {
+    if (isBool(value)) return value ? "true" : "false";
+    if (isNum(value)) {
+      // integers render without a decimal point
+      if (Number.isInteger(value)) return String(value);
+      return String(value);
+    }
+    return String(value);
+  }
+
+  // ---- expression tokenizer --------------------------------------------- //
+
+  const TOKEN_SPECS = [
+    ["OPEN_PARENTHESIS", /^\(/],
+    ["CLOSE_PARENTHESIS", /^\)/],
+    ["OPEN_CURLY", /^\{/],
+    ["CLOSE_CURLY", /^\}/],
+    ["OPEN_SQUARE", /^\[/],
+    ["CLOSE_SQUARE", /^\]/],
+    ["FUNCTION", /^(not|round|timestamp|log|length|auto)\s*\(/],
+    ["NUMBER", /^\d+(\.\d+)?\b/],
+    ["CURLY_QUOTE", /^[“”]/],
+    ["WHITESPACE", /^\s+/],
+    ["NAMED_OPERATOR", /^(and|or|modulo)\b/],
+    ["VAR", /^\w+/],
+    ["FAIRMATH", /^%[+\-]/],
+    ["OPERATOR", /^[+\-*/&%^#]/],
+    ["INEQUALITY", /^[!<>]=?/],
+    ["EQUALITY", /^=/],
+    ["COMMA", /^,/],
+  ];
+  const FUNC_NAME_RE = /^\w+/;
+
+  class Token {
+    constructor(name, value, pos, func) {
+      this.name = name;
+      this.value = value;
+      this.pos = pos;
+      this.func = func || null;
+    }
+  }
+
+  function tokenize(expr) {
+    let s = expr;
+    let pos = 0;
+    const tokens = [];
+    while (s) {
+      // String literal with backslash escapes.
+      if (s[0] === '"') {
+        let i = 1;
+        let found = false;
+        while (i < s.length) {
+          const c = s[i];
+          if (c === "\\") { i += 1; }
+          else if (c === '"') { found = true; break; }
+          i += 1;
+        }
+        if (!found) throw new ExprError("Invalid string, open quote with no close quote: " + s);
+        const matched = s.slice(0, i + 1);
+        pos += matched.length;
+        tokens.push(new Token("STRING", matched, pos));
+        s = s.slice(matched.length);
+        continue;
+      }
+      let matched = null;
+      for (const [name, rx] of TOKEN_SPECS) {
+        const m = rx.exec(s);
+        if (m && m[0]) { matched = [name, m[0]]; break; }
+      }
+      if (matched === null) throw new ExprError("Invalid expression, could not tokenize at: " + s);
+      const [name, value] = matched;
+      pos += value.length;
+      s = s.slice(value.length);
+      if (name === "CURLY_QUOTE") throw new ExprError("Invalid use of curly smart quote: " + value);
+      if (name === "WHITESPACE") continue;
+      let func = null;
+      if (name === "FUNCTION") func = FUNC_NAME_RE.exec(value)[0];
+      tokens.push(new Token(name, value, pos, func));
+    }
+    return tokens;
+  }
+
+  // ---- operators -------------------------------------------------------- //
+
+  function fairAdd(v1, v2) {
+    v1 = toNum(v1); v2 = toNum(v2);
+    if (!(v1 >= 0 && v1 <= 100)) throw new ExprError("Can't fairAdd to non-percentile value: " + v1);
+    if (v2 > 0) {
+      const mult = (100 - v1) / 100.0;
+      const value = Math.floor(v1 + v2 * mult);
+      return value > 99 ? 99 : value;
+    }
+    const mult = v1 / 100.0;
+    const value = Math.ceil(v1 - (-v2) * mult);
+    return value < 1 ? 1 : value;
+  }
+  function fairSub(v1, v2) { return fairAdd(v1, -toNum(v2)); }
+
+  function equals(v1, v2) {
+    if (isBool(v1) || isBool(v2)) {
+      return v1 === v2 || String(v1).toLowerCase() === String(v2).toLowerCase();
+    }
+    return v1 === v2 || String(v1) === String(v2);
+  }
+  function divide(a, b) {
+    b = toNum(b);
+    if (b === 0) throw new ExprError("can't divide by zero");
+    return toNum(a) / b;
+  }
+  function concat(a, b) { return csStr(a) + csStr(b); }
+  function numBin(fn) { return (a, b) => fn(toNum(a), toNum(b)); }
+  // The `#` operator: 1-based character index into a string (e.g. name#1
+  // returns the first character). Mirrors Scene.operators['#'] in scene.js.
+  function charAt(v1, v2) {
+    const s = csStr(v1);
+    const i = toNum(v2);
+    if (i !== Math.floor(i)) throw new ExprError("There is no character at position " + i + "; the position must be a whole number.");
+    if (i < 1) throw new ExprError("There is no character at position " + i + "; the position must be greater than or equal to 1.");
+    if (i > s.length) throw new ExprError('There is no character at position ' + i + '. "' + s + '" is only ' + s.length + " characters long.");
+    return s.charAt(i - 1);
+  }
+
+  const OPERATORS = {
+    "+": numBin((a, b) => a + b),
+    "-": numBin((a, b) => a - b),
+    "*": numBin((a, b) => a * b),
+    "/": (a, b) => divide(a, b),
+    "^": numBin((a, b) => Math.pow(a, b)),
+    "modulo": numBin((a, b) => ((a % b) + b) % b),
+    "&": (a, b) => concat(a, b),
+    "#": charAt,
+    "%+": fairAdd,
+    "%-": fairSub,
+    "=": equals,
+    "!=": (a, b) => !equals(a, b),
+    "<": numBin((a, b) => a < b),
+    ">": numBin((a, b) => a > b),
+    "<=": numBin((a, b) => a <= b),
+    ">=": numBin((a, b) => a >= b),
+    "and": (a, b) => toBool(a) && toBool(b),
+    "or": (a, b) => toBool(a) || toBool(b),
+  };
+
+  // ---- evaluator -------------------------------------------------------- //
+
+  class Evaluator {
+    constructor(resolver) { this.resolver = resolver; }
+
+    evalString(expr) { return this.evalTokens(tokenize(expr)); }
+    evalTokens(tokens) { return this._evalExpr(tokens.slice(), null); }
+
+    evalValueToken(stack) { return this._evalValueToken(stack.shift(), stack); }
+
+    evaluateReference(stack, toLower) {
+      if (toLower === undefined) toLower = true;
+      const norm = (name) => toLower ? String(name).toLowerCase() : name;
+      const findClosing = (kind, offset) => {
+        let opens = 0;
+        const openName = "OPEN_" + kind, closeName = "CLOSE_" + kind;
+        for (let i = offset || 0; i < stack.length; i++) {
+          if (stack[i].name === openName) opens += 1;
+          else if (stack[i].name === closeName) {
+            if (opens) opens -= 1; else return i;
+          }
+        }
+        return -1;
+      };
+      if (!stack.length) throw new ExprError("Invalid expression, expected a name");
+      const head = stack[0];
+      if (head.name === "OPEN_CURLY") {
+        stack.shift();
+        const closing = findClosing("CURLY", 0);
+        if (closing === -1) throw new ExprError("Invalid expression, no closing curly bracket");
+        const name = this.evalTokens(stack.slice(0, closing));
+        stack.splice(0, closing + 1);
+        return norm(name);
+      }
+      if (head.name === "NUMBER") { stack.shift(); return head.value; }
+      if (head.name !== "VAR") {
+        throw new ExprError("Invalid expression; expected name, found " + head.name + " at char " + head.pos);
+      }
+      let name = String(head.value);
+      stack.shift();
+      while (stack.length && stack[0].name === "OPEN_SQUARE") {
+        const closing = findClosing("SQUARE", 1);
+        if (closing === -1) throw new ExprError("Invalid expression, no closing array bracket");
+        const index = this.evalTokens(stack.slice(1, closing));
+        name += "_" + csStr(index);
+        stack.splice(0, closing + 1);
+      }
+      return norm(name);
+    }
+
+    _evalExpr(stack, parenthetical) {
+      if (!stack.length) throw new ExprError("no expression specified");
+      let value1 = this._evalValueToken(stack.shift(), stack);
+      if (!stack.length) {
+        if (parenthetical) throw new ExprError("Invalid expression, expected " + parenthetical);
+        return value1;
+      }
+      let token = stack.shift();
+      if (parenthetical && parenthetical === token.name) return value1;
+      const op = OPERATORS[token.value];
+      if (op === undefined) {
+        throw new ExprError("Invalid expression at char " + token.pos +
+          ", expected OPERATOR, was: " + token.name + " [" + token.value + "]");
+      }
+      if (!stack.length) throw new ExprError("Invalid expression, expected something after a " + token.value);
+      const value2 = this._evalValueToken(stack.shift(), stack);
+      const result = op(value1, value2);
+      if (parenthetical) {
+        if (stack.length) {
+          token = stack.shift();
+          if (parenthetical === token.name) return result;
+          throw new ExprError("Invalid expression at char " + token.pos + ", expected " +
+            parenthetical + ", was: " + token.name + " [" + token.value + "]");
+        }
+        throw new ExprError("Invalid expression, expected " + parenthetical);
+      } else if (stack.length) {
+        token = stack.shift();
+        throw new ExprError("Invalid expression at char " + token.pos +
+          ", expected no more tokens, was: " + token.name + " [" + token.value + "]");
+      }
+      return result;
+    }
+
+    _evalValueToken(token, stack) {
+      const name = token.name;
+      if (name === "OPEN_PARENTHESIS") return this._evalExpr(stack, "CLOSE_PARENTHESIS");
+      if (name === "OPEN_CURLY") {
+        const value = this._evalExpr(stack, "CLOSE_CURLY");
+        return this.resolver.get_var(value);
+      }
+      if (name === "FUNCTION") {
+        const value = this._evalExpr(stack, "CLOSE_PARENTHESIS");
+        return this._callFunc(token.func, value);
+      }
+      if (name === "NUMBER") {
+        return /^\d+$/.test(token.value) ? parseInt(token.value, 10) : parseFloat(token.value);
+      }
+      if (name === "STRING") {
+        let inner = token.value.slice(1, -1);
+        inner = inner.replace(/\\(.)/g, "$1");
+        return this.resolver.replace_variables(inner);
+      }
+      if (name === "VAR") {
+        let variable = String(token.value);
+        while (stack.length && stack[0].name === "OPEN_SQUARE") {
+          stack.shift();
+          const idx = this._evalExpr(stack, "CLOSE_SQUARE");
+          variable += "_" + csStr(idx);
+        }
+        return this.resolver.get_var(variable);
+      }
+      throw new ExprError("Invalid expression at char " + token.pos +
+        ", expected NUMBER, STRING, VAR or PARENTHETICAL, was: " + name + " [" + token.value + "]");
+    }
+
+    _callFunc(func, value) {
+      if (func === "not") return !toBool(value);
+      if (func === "round") return Math.floor(toNum(value) + 0.5);
+      if (func === "length") return csStr(value).length;
+      if (func === "log") return Math.log10(toNum(value));
+      if (func === "timestamp") return parseTimestamp(csStr(value));
+      if (func === "auto") throw new ExprError("auto() must come after a < or > symbol");
+      throw new ExprError("Unknown function " + func);
+    }
+  }
+
+  function parseTimestamp(value) {
+    const t = Date.parse(value.trim());
+    if (isNaN(t)) throw new ExprError("timestamp() could not parse date: " + value);
+    return Math.floor(t / 1000);
+  }
+
+  // ---- interpolation ---------------------------------------------------- //
+
+  const REPLACER = /[$@](!?!?)\{/g;
+
+  function replaceVariables(line, evaluator) {
+    line = String(line);
+    const output = [];
+    let index = 0;
+    while (true) {
+      REPLACER.lastIndex = index;
+      const m = REPLACER.exec(line);
+      if (!m) { output.push(line.slice(index)); break; }
+      output.push(line.slice(index, m.index));
+      const sigil = line[m.index];
+      const capitalize = m[1];
+      const exprStart = m.index + m[0].length;
+      let curlies = 0, closing = -1, i = exprStart;
+      while (i < line.length) {
+        const c = line[i];
+        if (c === "{") curlies += 1;
+        else if (c === "}") { if (curlies) curlies -= 1; else { closing = i; break; } }
+        i += 1;
+      }
+      if (closing === -1) throw new CSError("invalid " + line.slice(m.index, exprStart) + " variable substitution");
+      const body = line.slice(exprStart, closing);
+      let value = sigil === "$" ? evaluator.evalString(body) : evalMultireplace(body, evaluator);
+      value = csStr(value);
+      if (capitalize === "!") value = value.slice(0, 1).toUpperCase() + value.slice(1);
+      else if (capitalize === "!!") value = value.toUpperCase();
+      output.push(value);
+      index = closing + 1;
+    }
+    return output.join("");
+  }
+
+  function evalMultireplace(body, evaluator) {
+    let expr, options;
+    if (/^\s*\(/.test(body)) {
+      let parens = 0, closingParen = -1;
+      for (let i = 1; i < body.length; i++) {
+        const c = body[i];
+        if (c === "(") parens += 1;
+        else if (c === ")") { if (parens) parens -= 1; else { closingParen = i; break; } }
+      }
+      if (closingParen === -1) throw new CSError("invalid @{} multireplace; missing closing parenthesis");
+      if (closingParen + 1 >= body.length || body[closingParen + 1] !== " ")
+        throw new CSError("invalid @{} multireplace; there should be a space after )");
+      expr = body.slice(1, closingParen);
+      options = body.slice(closingParen + 2).split("|");
+    } else {
+      if (!/^\S+ /.test(body))
+        throw new CSError("invalid @{} multireplace; there should be a space after the first word");
+      const spaceIndex = body.indexOf(" ");
+      expr = body.slice(0, spaceIndex);
+      options = body.slice(spaceIndex + 1).split("|");
+    }
+    if (options.length < 2) throw new CSError("invalid @{} multireplace; need at least one pipe |");
+    let value = evaluator.evalString(expr);
+    if (isBool(value) || (isStr(value) && (value.toLowerCase() === "true" || value.toLowerCase() === "false"))) {
+      value = toBool(value) ? 1 : 2;
+    }
+    value = Math.trunc(toNum(value));
+    if (value < 1) throw new CSError("invalid @{} multireplace; '" + expr + "' = " + value + " is not positive");
+    if (value > options.length)
+      throw new CSError("invalid @{} multireplace; '" + expr + "' = " + value +
+        " but there are only " + options.length + " options");
+    return replaceVariables(options[value - 1], evaluator);
+  }
+
+  const MARKUP_RE = /\[\/?(i|b|lie|key|val|stat|suspiciously|optimistically)\]/g;
+  // Mirror the game's replaceBbCode for the tags that carry layout meaning:
+  // [n/] is a hard line break and [c/] is a "continue, no space" marker that
+  // renders as nothing. The remaining styling tags are simply dropped. The
+  // resulting "\n" survives paragraph joining (which only collapses spaces and
+  // tabs) and shows as a line break wherever text is rendered pre-wrap.
+  function stripMarkup(text) {
+    return String(text)
+      .replace(/\[n\/\]/g, "\n")
+      .replace(/\[c\/\]/g, "")
+      .replace(MARKUP_RE, "");
+  }
+
+  root.CS = { CSError, ExprError, GameOver, QuitGame, LoadGame, RestartGame,
+    Line, parseScene, getIndent, toNum, toBool, csStr, Token, tokenize, OPERATORS,
+    Evaluator, replaceVariables, stripMarkup };
+
+  // ---- state serialization ---------------------------------------------- //
+  // Mirrors the Python _to_jsonable/_from_jsonable. JS also has Map values
+  // (_choice_ends/_choice_used with integer keys) which JSON can't hold, so a
+  // Map is encoded as {__map__: [[k, v], ...]} and restored to a Map on load.
+
+  function toJsonable(obj) {
+    if (obj instanceof Map) {
+      return { __map__: Array.from(obj.entries()).map(([k, v]) => [k, toJsonable(v)]) };
+    }
+    if (Array.isArray(obj)) return obj.map(toJsonable);
+    if (obj && typeof obj === "object") {
+      const out = {};
+      for (const k of Object.keys(obj)) out[k] = toJsonable(obj[k]);
+      return out;
+    }
+    return obj;
+  }
+
+  function fromJsonable(obj) {
+    if (Array.isArray(obj)) return obj.map(fromJsonable);
+    if (obj && typeof obj === "object") {
+      const keys = Object.keys(obj);
+      if (keys.length === 1 && keys[0] === "__map__") {
+        const m = new Map();
+        for (const [k, v] of obj.__map__) m.set(keyFrom(k), fromJsonable(v));
+        return m;
+      }
+      const out = {};
+      for (const k of keys) out[k] = fromJsonable(obj[k]);
+      return out;
+    }
+    return obj;
+  }
+
+  function keyFrom(k) {
+    if (typeof k === "string" && /^-?\d+$/.test(k)) return parseInt(k, 10);
+    return k;
+  }
+
+  // Plain deep copy for already-jsonable data (checkpoints/state). Must NOT
+  // use fromJsonable, which would turn serialized {__map__} into live Maps and
+  // corrupt the jsonable form.
+  function deepCopy(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+  // ---- engine ----------------------------------------------------------- //
+
+  function truthy(value) { return toBool(value); }
+
+  const INITIAL_COMMANDS = new Set([
+    "create", "create_array", "scene_list", "title", "author", "comment",
+    "achievement", "product", "ifid",
+  ]);
+
+  const NOOP_COMMANDS = new Set([
+    "page_break_advertisement", "finish_advertisement", "advertisement",
+    "check_purchase", "restore_purchases", "purchase", "looplimit",
+    "purchase_discount", "print_discount", "check_registration", "login",
+    "subscribe", "share_this_game", "more_games", "feedback",
+    "check_achievements",
+    "sound", "youtube", "link",
+    "link_button", "track_event", "timer", "ifid", "product",
+    "show_password", "author", "delay_break",
+    "end_trial", "script", "achievement",
+  ]);
+
+  const ENV_VARS = {
+    choice_subscribe_allowed: () => true,
+    choice_register_allowed: () => false,
+    choice_registered: () => false,
+    choice_is_web: () => false,
+    choice_is_steam: () => false,
+    choice_is_steam_deck: () => false,
+    choice_is_ios_app: () => false,
+    choice_is_ipad_app: () => false,
+    choice_is_android_app: () => false,
+    choice_is_omnibus_app: () => false,
+    choice_is_amazon_app: () => false,
+    choice_is_advertising_supported: () => false,
+    choice_is_trial: () => false,
+    choice_prerelease: () => false,
+    choice_kindle: () => false,
+    choice_randomtest: () => false,
+    choice_quicktest: () => false,
+    choice_nightmode: () => false,
+    choice_purchase_supported: () => false,
+    choice_purchased_adfree: () => true,
+    choice_purchased_everything: () => true,
+    choice_restore_purchases_allowed: () => false,
+    choice_save_allowed: () => true,
+    choice_release_date: () => "release day",
+  };
+
+  class Scene {
+    constructor(name, lines) {
+      this.name = name;
+      this.lines = lines;
+      this.labels = {};
+      this._indexLabels();
+    }
+    _indexLabels() {
+      for (let i = 0; i < this.lines.length; i++) {
+        const ln = this.lines[i];
+        if (ln.command && ln.command.toLowerCase() === "label") {
+          const label = ln.arg.trim().toLowerCase();
+          if (/\s/.test(label)) {
+            throw new CSError("label '" + label + "' is not allowed to contain spaces", this.name, ln.num);
+          }
+          if (label in this.labels) {
+            throw new CSError("label '" + label + "' already defined on line " +
+              this.lines[this.labels[label]].num, this.name, ln.num);
+          }
+          this.labels[label] = i;
+        }
+      }
+    }
+  }
+
+  class Engine {
+    constructor(io, sceneLoader) {
+      // sceneLoader(name) -> array of Line (parsed). Replaces filesystem access.
+      this.io = io;
+      this._loader = sceneLoader;
+      io.engine = this;
+      this.stats = {};
+      this.temps = this._freshTemps();
+      this.scene_list = [];
+      this.scene_cache = {};
+      this.evaluator = new Evaluator(this);
+
+      this.scene = null;
+      this.line_num = 0;
+      this.indent = 0;
+      this.finished = false;
+      this.initial_commands = true;
+
+      this._para = [];
+      this.achievements = {};
+      this.unlocked = new Set();
+      this.checkpoints = {};
+      this._resume = null;
+      this._pending_scene = null;
+      this._in_stats = false;
+      this._rng = Math.random;  // overridable for deterministic tests
+    }
+
+    _freshTemps() {
+      return {
+        choice_reuse: "allow",
+        param: [],
+        _choice_ends: new Map(),
+        _choice_used: new Map(),
+        _choice_substack: [],
+        _fake_choice_depth: 0,
+      };
+    }
+
+    // ---- resolver interface ---- //
+
+    get_var(variable) {
+      variable = String(variable).toLowerCase();
+      if (variable && /^-?\d+$/.test(variable)) return parseInt(variable, 10);
+      if (variable === "true") return true;
+      if (variable === "false") return false;
+      const env = ENV_VARS[variable];
+      if (env !== undefined) return env(this);
+      if (variable === "choice_linenum") return this.line_num;
+      if (variable === "choice_scene") return this.scene ? this.scene.name : "";
+      if (variable.startsWith("choice_saved_checkpoint")) return !!this.stats[variable];
+      if (variable.startsWith("choice_achieved_"))
+        return this.unlocked.has(variable.slice("choice_achieved_".length));
+      if (variable.startsWith("choice_purchased_")) return true;
+      if (variable === "choice_user_restored" && !(variable in this.temps)) return false;
+      if (variable === "choice_just_restored_checkpoint" && !(variable in this.temps)) return false;
+      let value;
+      if (variable in this.temps) value = this.temps[variable];
+      else if (variable in this.stats) value = this.stats[variable];
+      else {
+        if (variable === "implicit_control_flow") return false;
+        throw new CSError("Non-existent variable '" + variable + "'",
+          this.scene ? this.scene.name : null, this._curNum());
+      }
+      if (value === null || value === undefined) {
+        throw new CSError("Variable '" + variable + "' exists but has no value",
+          this.scene ? this.scene.name : null, this._curNum());
+      }
+      return value;
+    }
+
+    replace_variables(text) { return replaceVariables(text, this.evaluator); }
+
+    set_var(variable, value) {
+      variable = String(variable).toLowerCase();
+      if (variable in this.temps) this.temps[variable] = value;
+      else if (variable in this.stats) this.stats[variable] = value;
+      else throw new CSError("Non-existent variable '" + variable + "'",
+        this.scene ? this.scene.name : null, this._curNum());
+    }
+
+    _validateVariable(variable) {
+      if (!variable || !/^[a-zA-Z]/.test(variable))
+        throw this._err("Invalid variable name, must start with a letter: " + variable);
+      if (!/^\w+$/.test(variable))
+        throw this._err("Invalid variable name: '" + variable + "'");
+      if (/^(and|or|true|false|scene|scenename)$/i.test(variable))
+        throw this._err("Invalid variable name, '" + variable + "' is a reserved word");
+      if (variable.startsWith("choice_"))
+        throw this._err("variables may not start with 'choice_'");
+    }
+
+    _curNum() {
+      if (this.scene && this.line_num >= 0 && this.line_num < this.scene.lines.length)
+        return this.scene.lines[this.line_num].num;
+      return null;
+    }
+    _err(msg) { return new CSError(msg, this.scene ? this.scene.name : null, this._curNum()); }
+    _safeGet(name) { try { return this.get_var(name); } catch (e) { if (e instanceof CSError) return null; throw e; } }
+
+    // ---- scene loading + run ---- //
+
+    load_scene(name) {
+      name = name.toLowerCase();
+      if (!(name in this.scene_cache)) {
+        const lines = this._loader(name);
+        this.scene_cache[name] = new Scene(name, lines);
+      }
+      return this.scene_cache[name];
+    }
+
+    run(startScene) {
+      this._enterScene(this.load_scene(startScene || "startup"));
+      this._runUntilEnd();
+    }
+
+    resumeFromState(state) {
+      this._applyState(state);
+      this._runUntilEnd();
+    }
+
+    // Run choicescript_stats against the *already-applied* engine state, as a
+    // single scene. Unlike showStats() this does NOT snapshot/restore — it's
+    // meant for a throwaway engine whose state was set via _applyState. Because
+    // stats screens are often interactive (*choice menus of stat categories),
+    // the io is free to throw StopReplay at a prompt; that propagates to the
+    // caller, which records the answer and re-runs from the top. Mirrors the
+    // single-scene model of engine.py show_stats (labels/goto within the scene
+    // work; goto_scene out of stats is not followed, by ChoiceScript convention).
+    runStatsScene() {
+      this.scene = this.load_scene("choicescript_stats");
+      this.line_num = 0;
+      this.indent = 0;
+      this.finished = false;
+      this.temps = this._freshTemps();
+      this._para = [];
+      this._pending_scene = null;
+      this._resume = null;
+      this._in_stats = true;
+      this._runStatsLoop();
+      this._in_stats = false;
+    }
+
+    // Drive the stats overlay to completion. Unlike a single _printLoop() call,
+    // this follows *gosub_scene transitions (e.g. magics' appearance text calls
+    // out to utils) and the *return that comes back, so the whole stats scene
+    // renders. Unlike _mainLoop it never advances into the next scene in the
+    // scene list: when the stats scene finishes with no pending transition,
+    // we're done.
+    _runStatsLoop() {
+      try {
+        while (true) {
+          this._printLoop();
+          if (this._pending_scene !== null) {
+            const nxt = this._pending_scene;
+            this._pending_scene = null;
+            this._enterScene(nxt);
+            continue;
+          }
+          break;
+        }
+      } catch (e) {
+        if (!(e instanceof GameOver)) throw e;
+      }
+      this._flushParagraph();
+    }
+
+    // Run choicescript_stats as a read-only overlay against current state, then
+    // restore everything (the stats scene may *set globals as harmless
+    // normalizations, so we snapshot stats too). Mirrors engine.py show_stats.
+    // The caller must have made "choicescript_stats" loadable; if the loader
+    // can't find it, the CSError propagates.
+    showStats() {
+      const saved = {
+        scene: this.scene, line_num: this.line_num, indent: this.indent,
+        finished: this.finished, temps: this.temps, _para: this._para,
+        _pending_scene: this._pending_scene, _resume: this._resume,
+        initial_commands: this.initial_commands, stats: Object.assign({}, this.stats),
+      };
+      try {
+        this.scene = this.load_scene("choicescript_stats");
+        this.line_num = 0;
+        this.indent = 0;
+        this.finished = false;
+        this.temps = this._freshTemps();
+        this._para = [];
+        this._pending_scene = null;
+        this._resume = null;
+        this._in_stats = true;
+        this._runStatsLoop();
+      } finally {
+        this._in_stats = false;
+        this.scene = saved.scene;
+        this.line_num = saved.line_num;
+        this.indent = saved.indent;
+        this.finished = saved.finished;
+        this.temps = saved.temps;
+        this._para = saved._para;
+        this._pending_scene = saved._pending_scene;
+        this._resume = saved._resume;
+        this.initial_commands = saved.initial_commands;
+        this.stats = saved.stats;
+      }
+    }
+
+    _runUntilEnd() {
+      while (true) {
+        try {
+          this._mainLoop();
+          return;
+        } catch (e) {
+          if (e instanceof RestartGame) {
+            this._resetAll();
+            this._enterScene(this.load_scene("startup"));
+            continue;
+          }
+          if (e instanceof LoadGame) { this._applyState(e.state); continue; }
+          if (e instanceof QuitGame) {
+            try { this.autosave(); } catch (_) { /* never mask quit */ }
+            throw e;
+          }
+          throw e;
+        }
+      }
+    }
+
+    _mainLoop() {
+      try {
+        while (true) {
+          this._printLoop();
+          if (this._pending_scene !== null) {
+            const nxt = this._pending_scene;
+            this._pending_scene = null;
+            this._enterScene(nxt);
+            continue;
+          }
+          const nxt = this._nextSceneName(this.scene.name);
+          if (!nxt) break;
+          this.temps = this._freshTemps();
+          this._enterScene(this.load_scene(nxt));
+        }
+      } catch (e) {
+        if (e instanceof GameOver) { this._flushParagraph(); return; }
+        throw e;
+      }
+    }
+
+    _enterScene(scene) {
+      this.scene = scene;
+      this.finished = false;
+      this._pending_scene = null;
+      const resume = this._resume;
+      if (resume !== null && resume[0] === scene.name) {
+        const [, lineNum, indent] = resume;
+        this.line_num = lineNum != null ? lineNum : 0;
+        this.indent = indent != null ? indent : scene.lines[this.line_num].indent;
+      } else {
+        this.line_num = 0;
+        this.indent = 0;
+      }
+      this._resume = null;
+      if (scene.name !== "startup") this.initial_commands = false;
+    }
+
+    _nextSceneName(current) {
+      const i = this.scene_list.indexOf(current);
+      if (i === -1) return null;
+      if (i + 1 < this.scene_list.length) return this.scene_list[i + 1];
+      return null;
+    }
+
+    // ---- save / load state ---- //
+
+    _baseState() {
+      return {
+        version: 1,
+        scene: this.scene ? this.scene.name : null,
+        line_num: this.line_num,
+        indent: this.indent,
+        initial_commands: this.initial_commands,
+        scene_list: this.scene_list.slice(),
+        stats: toJsonable(this.stats),
+        temps: toJsonable(this.temps),
+        unlocked: Array.from(this.unlocked).sort(),
+      };
+    }
+
+    captureState() {
+      const state = this._baseState();
+      if (Object.keys(this.checkpoints).length) state.checkpoints = deepCopy(this.checkpoints);
+      return state;
+    }
+
+    _applyState(state) {
+      this.scene_list = (state.scene_list || []).slice();
+      this.stats = fromJsonable(state.stats);
+      this.temps = fromJsonable(state.temps);
+      this.unlocked = new Set(state.unlocked || []);
+      this.checkpoints = deepCopy(state.checkpoints || {});
+      this.initial_commands = state.initial_commands === undefined ? false : state.initial_commands;
+      this._pending_scene = null;
+      this._resume = null;
+      this._para = [];
+      this.finished = false;
+      this.scene = state.scene ? this.load_scene(state.scene) : null;
+      this.line_num = state.line_num || 0;
+      this.indent = state.indent || 0;
+    }
+
+    _resetAll() {
+      this.stats = {};
+      this.temps = this._freshTemps();
+      this.scene_list = [];
+      this.unlocked = new Set();
+      this.checkpoints = {};
+      this.initial_commands = true;
+      this._pending_scene = null;
+      this._resume = null;
+      this._para = [];
+      this.finished = false;
+      this.scene = null;
+      this.line_num = 0;
+      this.indent = 0;
+    }
+
+    autosave() {
+      if (this.scene === null) return;
+      if (this.io.on_autosave) this.io.on_autosave(this.captureState());
+    }
+
+    requestRestart() { throw new RestartGame(); }
+
+    // ---- main interpreter loop (mirrors Scene.prototype.printLoop) ---- //
+
+    _printLoop() {
+      const lines = this.scene.lines;
+      this.finished = false;
+      while (!this.finished && this.line_num < lines.length) {
+        const line = lines[this.line_num];
+        if (line.is_blank) { this._flushParagraph(); this.line_num += 1; continue; }
+
+        const indent = line.indent;
+        if (indent > this.indent) {
+          if (line.command && line.command.toLowerCase() === "comment") { this.line_num += 1; continue; }
+          throw this._err("increasing indent not allowed, expected " + this.indent + " was " + indent);
+        }
+
+        const end = this.temps._choice_ends.get(this.line_num);
+        if (end !== undefined &&
+            (truthy(this._safeGet("implicit_control_flow")) || this.temps._fake_choice_depth > 0)) {
+          this.line_num = end + 1;
+          if (this.temps._fake_choice_depth > 0) this.temps._fake_choice_depth -= 1;
+          continue;
+        }
+
+        this.indent = indent;
+
+        if (line.command == null && line.text.startsWith("#")) {
+          throw this._err("It is illegal to fall out of a *choice statement; " +
+            "you must *goto or *finish before the end of the indented block.");
+        }
+
+        if (line.command == null) {
+          this.initial_commands = false;
+          this._printText(line.text);
+        } else {
+          this._runCommand(line);
+        }
+        this.line_num += 1;
+      }
+      this._flushParagraph();
+      if (!this.finished) this.finished = true;
+    }
+
+    _runCommand(line) {
+      const cmd = line.command.toLowerCase();
+      const data = line.arg.trim();
+      if (INITIAL_COMMANDS.has(cmd)) {
+        if (this.scene.name !== "startup" || !this.initial_commands) {
+          if (cmd !== "comment")
+            throw this._err("Invalid " + cmd + " instruction, only allowed at top of startup.txt");
+        }
+      } else {
+        this.initial_commands = false;
+      }
+      const handler = DISPATCH[cmd];
+      if (handler === undefined) {
+        if (NOOP_COMMANDS.has(cmd)) return;
+        throw this._err("Non-existent command '" + cmd + "'");
+      }
+      handler.call(this, data, line);
+    }
+
+    _printText(text) { this._para.push(stripMarkup(this.replace_variables(text))); }
+
+    _flushParagraph() {
+      if (this._para.length) {
+        let joined = this._para.filter((p) => p !== "").join(" ");
+        joined = joined.replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim();
+        if (joined) this.io.text(joined);
+      }
+      this._para = [];
+    }
+  }
+
+  // ---- command handlers (mirror engine._cmd_*) ---- //
+  const E = Engine.prototype;
+
+  E._evalLiteral = function (expr, line) {
+    if (expr === "") throw this._err("no value specified: " + line.text);
+    return this.evaluator.evalString(expr);
+  };
+
+  E._cmd_create = function (data, line) {
+    const m = /^(\w*)([\s\S]*)$/.exec(data);
+    let variable = m[1];
+    this._validateVariable(variable);
+    variable = variable.toLowerCase();
+    this.stats[variable] = this._evalLiteral(m[2].trim(), line);
+    return false;
+  };
+
+  E._cmd_temp = function (data, line) {
+    const m = /^(\w*)([\s\S]*)$/.exec(data);
+    let variable = m[1];
+    this._validateVariable(variable);
+    variable = variable.toLowerCase();
+    const rest = m[2].trim();
+    this.temps[variable] = rest ? this._evalLiteral(rest, line) : null;
+    return false;
+  };
+
+  E._cmd_create_array = function (data, line) { this._defineArray(data, line, false); return false; };
+  E._cmd_temp_array = function (data, line) { this._defineArray(data, line, true); return false; };
+
+  E._defineArray = function (data, line, temp) {
+    const m = /^(\w+)([\s\S]*)$/.exec(data);
+    if (!m) throw this._err("Invalid array instruction, no name specified: " + line.text);
+    let variable = m[1];
+    this._validateVariable(variable);
+    variable = variable.toLowerCase();
+    const stack = tokenize(m[2].trim());
+    if (!stack.length) throw this._err("Invalid array instruction, missing length: " + line.text);
+    let length = Math.trunc(toNum(this.evaluator.evalValueToken(stack)));
+    if (length < 1) throw this._err("Invalid array instruction, length must be a whole number > 0");
+    let values = [];
+    while (stack.length) values.push(this.evaluator.evalValueToken(stack));
+    if (!values.length) throw this._err("Invalid array instruction, no value specified: " + line.text);
+    if (values.length === 1) { const v = values[0]; values = new Array(length).fill(v); }
+    else if (values.length !== length)
+      throw this._err("array expected 1 or " + length + " values, got " + values.length);
+    const target = temp ? this.temps : this.stats;
+    for (let i = 0; i < length; i++) target[variable + "_" + (i + 1)] = values[i];
+    target[variable + "_count"] = length;
+  };
+
+  E._cmd_set = function (data, line) {
+    const stack = tokenize(data);
+    const variable = this.evaluator.evaluateReference(stack);
+    this._requireVar(variable);
+    if (!stack.length) throw this._err("Invalid set instruction, no expression: " + line.text);
+    this._applySet(variable, stack);
+    return false;
+  };
+
+  E._cmd_setref = function (data, line) {
+    const stack = tokenize(data);
+    const variable = String(this.evaluator.evalValueToken(stack)).toLowerCase();
+    this._requireVar(variable);
+    this._applySet(variable, stack);
+    return false;
+  };
+
+  E._applySet = function (variable, stack) {
+    // Leading operator => implicitly based on the variable's current value.
+    if (stack.length && (stack[0].name === "OPERATOR" || stack[0].name === "FAIRMATH")) {
+      stack.unshift(new Token("VAR", variable, "(implicit)"));
+    }
+    this.set_var(variable, this.evaluator.evalTokens(stack));
+  };
+
+  E._cmd_delete = function (data) {
+    const variable = String(this.evaluator.evaluateReference(tokenize(data)));
+    delete this.temps[variable];
+    delete this.stats[variable];
+    return false;
+  };
+
+  E._cmd_rand = function (data) {
+    const stack = tokenize(data);
+    if (!stack.length) throw this._err("Invalid rand statement, expected: varname min max");
+    const variable = this.evaluator.evaluateReference(stack);
+    this._requireVar(variable);
+    const minimum = this.evaluator.evalValueToken(stack);
+    const maximum = this.evaluator.evalValueToken(stack);
+    if (stack.length) throw this._err("Invalid rand statement, expected three args");
+    const lo = toNum(minimum), hi = toNum(maximum);
+    const diff = hi - lo;
+    if (diff < 0) throw this._err("rand min must be <= max: " + lo + " > " + hi);
+    if (diff === 0) this.set_var(variable, lo);
+    else if (Number.isInteger(lo) && Number.isInteger(hi))
+      this.set_var(variable, lo + Math.floor(this._rng() * (diff + 1)));
+    else this.set_var(variable, lo + this._rng() * diff);
+    return false;
+  };
+
+  E._requireVar = function (variable) {
+    if (!(variable in this.temps) && !(variable in this.stats))
+      throw this._err("Non-existent variable '" + variable + "'");
+  };
+
+  // ---- control flow ---- //
+
+  E._cmd_goto = function (data) { this._gotoLabel(this._resolveLabelName(data)); return true; };
+  E._cmd_gotoref = function (data) {
+    this._gotoLabel(String(this.evaluator.evalString(data)).toLowerCase()); return true;
+  };
+  E._resolveLabelName = function (data) {
+    if (/[\[\{]/.test(data)) return String(this.evaluator.evaluateReference(tokenize(data)));
+    return String(data).toLowerCase();
+  };
+  E._gotoLabel = function (label) {
+    if (!(label in this.scene.labels)) throw this._err("bad label " + label);
+    this.line_num = this.scene.labels[label];
+    this.indent = this.scene.lines[this.line_num].indent;
+  };
+  E._cmd_label = function () { return false; };
+
+  E._cmd_if = function (data) {
+    if (truthy(this.evaluator.evalString(data))) this.indent = this._nextNonblankIndent();
+    else this._skipBranch(false);
+    return true;
+  };
+  E._cmd_else = function (data) {
+    if (data) {
+      if (/^if\b/.test(data)) throw this._err("'else if' is invalid, use 'elseif'");
+      throw this._err("nothing should appear on a line after 'else': " + data);
+    }
+    this._skipBranch(true);
+    return true;
+  };
+  E._cmd_elseif = function () { this._skipBranch(true); return true; };
+
+  E._nextNonblankIndent = function () {
+    const lines = this.scene.lines;
+    let i = this.line_num + 1;
+    while (i < lines.length && lines[i].is_blank) i += 1;
+    return i < lines.length ? lines[i].indent : this.indent;
+  };
+
+  E._skipBranch = function (inElse) {
+    const startIndent = this.indent;
+    let nextIndent = null;
+    const lines = this.scene.lines;
+    while (true) {
+      this.line_num += 1;
+      if (this.line_num >= lines.length) return;
+      const line = lines[this.line_num];
+      if (line.is_blank) continue;
+      const indent = line.indent;
+      if (nextIndent === null) {
+        if (indent <= startIndent) throw this._err("expected at least one line in 'if' true block");
+        nextIndent = indent;
+      }
+      if (indent <= startIndent) {
+        let parsed = null;
+        if (indent === startIndent && line.command) parsed = [line.command.toLowerCase(), line.arg.trim()];
+        if (!parsed || inElse) { this.line_num = this._previousNonblank(); this.indent = indent; return; }
+        const [command, cdata] = parsed;
+        if (command === "else") {
+          if (cdata) {
+            if (/^if\b/.test(cdata)) throw this._err("'else if' is invalid, use 'elseif'");
+            throw this._err("nothing should appear after 'else': " + cdata);
+          }
+          this.indent = this._nextNonblankIndent();
+        } else if (command === "elseif" || command === "elsif") {
+          if (truthy(this.evaluator.evalString(cdata))) this.indent = this._nextNonblankIndent();
+          else { this.indent = indent; this._skipBranch(false); return; }
+        } else if (command === "comment") {
+          continue;
+        } else {
+          this.line_num = this._previousNonblank(); this.indent = indent;
+        }
+        return;
+      }
+    }
+  };
+
+  E._previousNonblank = function () {
+    let i = this.line_num - 1;
+    const lines = this.scene.lines;
+    while (i > 0 && lines[i].is_blank) i -= 1;
+    return i;
+  };
+
+  // ---- gosub / return / scene transitions ---- //
+
+  E._cmd_gosub = function (data) {
+    const m = /\S+/.exec(data);
+    const label = m[0];
+    const rest = data.slice(label.length);
+    const args = this._evalArgList(rest);
+    // Some games (e.g. magics) draw their stat meters with a *gosub to a
+    // coloredbar routine whose body is a raw *script DOM block we can't run.
+    // Emit a structured bar instead so the front-end can paint it; if the IO
+    // opts out (console), fall through and run the label as a normal no-op.
+    if (label.toLowerCase() === "coloredbar" && this._emitColoredBar(args)) return true;
+    this.temps._choice_substack.push([this.line_num, this.indent]);
+    this.temps.param = args;
+    this._gotoLabel(/[\[\{]/.test(label) ? String(this.evaluator.evaluateReference(tokenize(label)))
+      : label.toLowerCase());
+    return true;
+  };
+
+  // coloredbar params: textwidth, label, colorhex, width ("NN%"), black.
+  // The score printed under the game's bar is stats[label.toLowerCase()].
+  E._emitColoredBar = function (args) {
+    if (!this.io.colored_bar) return false;
+    const label = csStr(args[1] != null ? args[1] : "");
+    const color = csStr(args[2] != null ? args[2] : "");
+    const pct = toNum(String(args[3] != null ? args[3] : "0").replace(/%/g, "").trim());
+    const key = label.toLowerCase();
+    const value = Object.prototype.hasOwnProperty.call(this.stats, key) ? this.stats[key] : "";
+    this._flushParagraph();
+    this.io.colored_bar({ label: label, color: color, pct: pct, value: csStr(value) });
+    return true;
+  };
+
+  E._cmd_return = function () {
+    const substack = this.temps._choice_substack;
+    if (substack.length) {
+      [this.line_num, this.indent] = substack.pop();
+      return;
+    }
+    const subscene = this.stats._choice_subscene_stack;
+    if (subscene && subscene.length) {
+      const frame = subscene.pop();
+      this.temps = frame.temps;
+      this._pending_scene = this.load_scene(frame.name);
+      this.finished = true;
+      this._resume = [frame.name, frame.line_num, frame.indent];
+      return true;
+    }
+    throw this._err("Invalid *return; without any *gosub");
+  };
+
+  E._cmd_gosub_scene = function (data, line) {
+    if (!this.stats._choice_subscene_stack) this.stats._choice_subscene_stack = [];
+    this.stats._choice_subscene_stack.push({
+      name: this.scene.name, line_num: this.line_num + 1, indent: this.indent, temps: this.temps,
+    });
+    this._cmd_goto_scene(data, line);
+    return true;
+  };
+
+  E._cmd_goto_scene = function (data) {
+    const [sceneName, label, param] = this._parseGotoScene(data);
+    const target = this.load_scene(sceneName);
+    this.temps = this._freshTemps();
+    this.temps.param = param;
+    this._pending_scene = target;
+    this.finished = true;
+    if (label != null) {
+      const idx = target.labels[label.toLowerCase()];
+      if (idx === undefined) throw this._err("bad label " + label);
+      this._resume = [sceneName, idx, null];
+    } else {
+      this._resume = [sceneName, 0, null];
+    }
+    this.initial_commands = true;
+    return true;
+  };
+
+  E._parseGotoScene = function (data) {
+    let param = [];
+    if (/[\[\{]/.test(data)) {
+      const stack = tokenize(data);
+      const sceneName = this.evaluator.evaluateReference(stack, false);
+      let label = null;
+      if (stack.length) label = this.evaluator.evaluateReference(stack);
+      while (stack.length) param.push(this.evaluator.evalValueToken(stack));
+      return [String(sceneName), label, param];
+    }
+    const m = /(\S+)\s+(\S+)\s*([\s\S]*)/.exec(data);
+    if (m) return [m[1], m[2], this._evalArgList(m[3])];
+    if (data === "") throw this._err("missing scene name");
+    return [data.trim(), null, param];
+  };
+
+  E._evalArgList = function (rest) {
+    const args = [];
+    const stack = tokenize(rest);
+    while (stack.length) args.push(this.evaluator.evalValueToken(stack));
+    return args;
+  };
+
+  E._cmd_params = function (data) {
+    let param = this.temps.param || [];
+    this.temps.param_count = param.length;
+    param = param.slice();
+    let n = 1;
+    let rest = data;
+    while (true) {
+      const m = /^\w+/.exec(rest);
+      if (!m) break;
+      const varName = m[0].toLowerCase();
+      this._validateVariable(varName);
+      if (!param.length) throw this._err("No parameter passed for " + varName);
+      const val = param.shift();
+      this.temps[varName] = val;
+      this.temps["param_" + n] = val;
+      n += 1;
+      rest = rest.slice(varName.length).replace(/^\s+/, "");
+    }
+    for (let i = 0; i < param.length; i++) this.temps["param_" + (n + i)] = param[i];
+    return false;
+  };
+
+  // ---- endings / restart ---- //
+
+  E._cmd_finish = function () {
+    this._flushParagraph();
+    this.finished = true;
+    if (!this._nextSceneName(this.scene.name)) throw new GameOver();
+    return true;
+  };
+  E._cmd_ending = function () { this._flushParagraph(); this.finished = true; throw new GameOver("ending"); };
+  // *delay_ending 1200 $5.99 $0.99 — shows a timed paywall then falls through to
+  // *ending (Scene.delay_ending calls this.ending()); either way it terminates
+  // the game. Without this the ending scene runs off its end and the main loop
+  // advances into the next scene in *scene_list (e.g. greattournament:
+  // ending -> death -> *goto_scene ending), looping forever.
+  E._cmd_delay_ending = function () { this._flushParagraph(); this.finished = true; throw new GameOver("ending"); };
+  E._cmd_abort = function () { this._flushParagraph(); this.finished = true; throw new GameOver("abort"); };
+  E._cmd_restart = function () { this._flushParagraph(); this.finished = true; throw new RestartGame(); };
+
+  // ---- reuse defaults ---- //
+
+  E._cmd_hide_reuse = function () { this.temps.choice_reuse = "hide"; return false; };
+  E._cmd_disable_reuse = function () { this.temps.choice_reuse = "disable"; return false; };
+  E._cmd_allow_reuse = function () { this.temps.choice_reuse = "allow"; return false; };
+
+  // ---- save/load game + checkpoints ---- //
+
+  E._cmd_save_game = function (data) {
+    const handler = this.io.on_save_game;
+    if (handler) {
+      this.line_num += 1;
+      try { handler.call(this.io, this, data.trim()); }
+      finally { this.line_num -= 1; }
+    }
+    return false;
+  };
+
+  E._cmd_restore_game = function (data) {
+    let cancelLabel = null;
+    data = data.trim();
+    if (data) {
+      const m = /^cancel=(\S+)$/.exec(data);
+      if (!m) throw this._err("invalid restore_game line: " + data);
+      cancelLabel = m[1];
+    }
+    // *restore_game may be followed by an indented sub-block declaring
+    // "timejump" save-slot messages (restoring saves from an earlier
+    // installment). We don't support cross-game restores, so consume and
+    // ignore that block — otherwise the print loop would hit its deeper
+    // indent and throw "increasing indent not allowed".
+    this._skipIndentedBlock();
+    if (this.io.on_restore_game) this.io.on_restore_game(this); // may throw LoadGame
+    if (cancelLabel != null) { this._gotoLabel(cancelLabel.toLowerCase()); return true; }
+    return false;
+  };
+
+  // Advance line_num past any lines indented deeper than the current command,
+  // leaving it on the last such line (the main loop's trailing increment then
+  // steps to the first line at the command's own indent or shallower).
+  E._skipIndentedBlock = function () {
+    const lines = this.scene.lines;
+    const startIndent = this.indent;
+    let i = this.line_num + 1;
+    while (i < lines.length && (lines[i].is_blank || lines[i].indent > startIndent)) i++;
+    this.line_num = i - 1;
+  };
+
+  E._checkpointSlot = function (data) {
+    let slot = data.trim();
+    if (slot) {
+      if (!/^[A-Za-z0-9_]+$/.test(slot)) return [null, null];
+      slot = slot.toLowerCase();
+      return [slot, "choice_saved_checkpoint_" + slot];
+    }
+    return ["checkpoint", "choice_saved_checkpoint"];
+  };
+
+  E._cmd_save_checkpoint = function (data) {
+    const [slot, stat] = this._checkpointSlot(data);
+    if (slot === null)
+      throw this._err("Invalid *save_checkpoint slot, must be only letters, numbers, and _ underscores: " + data.trim());
+    this.stats[stat] = true;
+    this.temps.choice_just_restored_checkpoint = false;
+    this.line_num += 1;
+    try { this.checkpoints[slot] = this._baseState(); }
+    finally { this.line_num -= 1; }
+    return false;
+  };
+
+  E._cmd_restore_checkpoint = function (data) {
+    const [slot, stat] = this._checkpointSlot(data);
+    if (slot === null)
+      throw this._err("Invalid *restore_checkpoint slot, must be only letters, numbers, and _ underscores: " + data.trim());
+    if (!this.stats[stat] || !(slot in this.checkpoints))
+      throw this._err("*restore_checkpoint failed; we haven't saved a checkpoint. Use *if " + stat);
+    const state = Object.assign({}, this.checkpoints[slot]);
+    state.checkpoints = deepCopy(this.checkpoints);
+    const temps = fromJsonable(state.temps);
+    temps.choice_just_restored_checkpoint = true;
+    state.temps = toJsonable(temps);
+    throw new LoadGame(state);
+  };
+
+  // ---- text / input ---- //
+
+  E._cmd_print = function (data) {
+    const value = this.evaluator.evalString(data);
+    this._para.push(stripMarkup(this.replace_variables(csStr(value))));
+    return false;
+  };
+  E._cmd_line_break = function () { this._para.push("\n"); return false; };
+  E._cmd_page_break = function (data) {
+    this._flushParagraph();
+    this.io.page_break(data ? this.replace_variables(data) : "Next");
+    return false;
+  };
+  E._cmd_input_text = function (data) {
+    const stack = tokenize(data);
+    const variable = this.evaluator.evaluateReference(stack);
+    this._requireVar(variable);
+    this._flushParagraph();
+    this.set_var(variable, this.io.input_text(variable));
+    return false;
+  };
+  E._cmd_input_number = function (data) {
+    const stack = tokenize(data);
+    const variable = this.evaluator.evaluateReference(stack);
+    const lo = this.evaluator.evalValueToken(stack);
+    const hi = this.evaluator.evalValueToken(stack);
+    this._flushParagraph();
+    this.set_var(variable, this.io.input_number(variable, toNum(lo), toNum(hi)));
+    return false;
+  };
+
+  // ---- images ---- //
+  // *image file [alignment]           (its own line/block, e.g. a divider)
+  // *text_image file [alignment] alt  (inline illustration with alt text)
+  // *kindle_image file [alignment] alt
+  // Args are space-separated; the source may contain {var} interpolation.
+  E._cmd_image = function (data) {
+    if (!this.io.image) return false;   // IO opts out: behave as a no-op
+    const parts = this.replace_variables(data.trim()).split(/\s+/);
+    const src = parts.shift() || "";
+    if (!src) return false;
+    let align = "center", alt = "";
+    const ALIGN = { left: 1, right: 1, center: 1, none: 1 };
+    if (parts.length && ALIGN[parts[0].toLowerCase()]) align = parts.shift().toLowerCase();
+    alt = parts.join(" ");
+    this._flushParagraph();
+    this.io.image({ src: src, align: align, alt: alt });
+    return false;
+  };
+
+  // ---- achievements / misc ---- //
+
+  E._cmd_achievement = function (data) {
+    const m = /(\w+)\s+(\S+)\s+(\d+)\s+([\s\S]*)/.exec(data);
+    if (m) this.achievements[m[1]] = m[4];
+    this._collectIndentedBlock();
+    return false;
+  };
+  E._cmd_achieve = function (data) {
+    const name = data.trim();
+    if (!this.unlocked.has(name)) {
+      this.unlocked.add(name);
+      this.io.achievement(this.achievements[name] || name);
+    }
+    return false;
+  };
+  E._cmd_bug = function (data) { throw this._err("*bug: " + this.replace_variables(data)); };
+  E._cmd_comment = function () { return false; };
+  E._cmd_scene_list = function () { this.scene_list = this._parseSceneList(); return true; };
+  E._cmd_title = function (data) { this.stats.choice_title = data.trim(); return false; };
+  E._cmd_author = function (data) { this.stats.choice_author = data.trim(); return false; };
+  E._cmd_arg0 = function () { return false; };
+
+  E._parseSceneList = function () {
+    const scenes = [];
+    const lines = this.scene.lines;
+    const startIndent = this.indent;
+    let nextIndent = null;
+    while (true) {
+      this.line_num += 1;
+      if (this.line_num >= lines.length) break;
+      const line = lines[this.line_num];
+      if (line.is_blank) continue;
+      const indent = line.indent;
+      if (nextIndent === null) {
+        if (indent <= startIndent) throw this._err("invalid indent, expected at least one row");
+        nextIndent = indent;
+      }
+      if (indent <= startIndent) { this.line_num -= 1; break; }
+      let text = line.text.trim();
+      const m = /^\$(\w*)\s+([\s\S]*)/.exec(text);
+      if (m) text = m[2];
+      text = text.toLowerCase();
+      if (!scenes.length && text !== "startup") scenes.push("startup");
+      scenes.push(text);
+    }
+    return scenes;
+  };
+
+  E._collectIndentedBlock = function () {
+    const rows = [];
+    const lines = this.scene.lines;
+    const startIndent = this.indent;
+    while (true) {
+      this.line_num += 1;
+      if (this.line_num >= lines.length) { this.line_num -= 1; break; }
+      const line = lines[this.line_num];
+      if (line.is_blank) continue;
+      if (line.indent <= startIndent) { this.line_num -= 1; break; }
+      rows.push([line.indent, line.text]);
+    }
+    return rows;
+  };
+
+  // ---- stat_chart ---- //
+
+  E._cmd_stat_chart = function () {
+    this._flushParagraph();
+    const block = this._collectIndentedBlock();
+    this.io.stat_chart(this._parseStatChart(block));
+    return true;
+  };
+
+  E._parseStatChart = function (block) {
+    const rows = [];
+    let i = 0;
+    while (i < block.length) {
+      const [indent, text] = block[i];
+      const m = /^(text|percent|opposed_pair)\s+([\s\S]*)$/.exec(text);
+      if (!m) { i += 1; continue; }
+      const kind = m[1];
+      const rest = m[2].trim();
+      if (kind === "opposed_pair") {
+        const labels = [];
+        let j = i + 1;
+        while (j < block.length && block[j][0] > indent && labels.length < 2) {
+          labels.push(this.replace_variables(block[j][1].trim()));
+          j += 1;
+        }
+        const value = this._safeGet(rest);
+        rows.push({ kind: "opposed_pair", labels, value: value != null ? toNum(value) : 0 });
+        i = j;
+        continue;
+      }
+      let varExpr, label;
+      if (rest.startsWith("(")) {
+        let depth = 0, close = -1;
+        for (let k = 0; k < rest.length; k++) {
+          if (rest[k] === "(") depth += 1;
+          else if (rest[k] === ")") { depth -= 1; if (depth === 0) { close = k; break; } }
+        }
+        varExpr = rest.slice(1, close);
+        label = rest.slice(close + 1).trim() || varExpr;
+      } else if (rest.indexOf(" ") !== -1) {
+        const sp = rest.indexOf(" ");
+        varExpr = rest.slice(0, sp); label = rest.slice(sp + 1);
+      } else { varExpr = rest; label = rest; }
+      const value = this.evaluator.evalString(varExpr);
+      rows.push({ kind, label: this.replace_variables(label.trim()), value });
+      let j = i + 1;
+      if (j < block.length && block[j][0] > indent) j += 1;
+      i = j;
+    }
+    return rows;
+  };
+
+  // ---- choices ---- //
+
+  E._cmd_choice = function (data) { this._doChoice(data, false); };
+  E._cmd_fake_choice = function (data) { this.temps._fake_choice_depth += 1; this._doChoice(data, true); };
+
+  E._doChoice = function (data, fake) {
+    const startIndent = this.indent;
+    const options = this._parseOptions(startIndent);
+    const visible = options.filter((o) => !o.hidden);
+    if (!visible.length) throw this._err("No displayable options");
+    this._flushParagraph();
+    const chosen = this.io.choose(visible);
+    const option = visible[chosen];
+    const optLine = option.line;
+    this.line_num = optLine;
+    this.indent = this._bodyIndent(optLine);
+    if (option.reuse && option.reuse !== "allow") this.temps._choice_used.set(optLine, 1);
+    this.finished = false;
+  };
+
+  E._bodyIndent = function (optLine) {
+    const lines = this.scene.lines;
+    let i = optLine + 1;
+    while (i < lines.length && lines[i].is_blank) i += 1;
+    return i < lines.length ? lines[i].indent : this.indent;
+  };
+
+  E._parseOptions = function (startIndent) {
+    const lines = this.scene.lines;
+    const choiceLine = this.line_num;
+    const options = [];
+    const choiceEnds = [];
+    let nextIndent = null;
+    while (true) {
+      this.line_num += 1;
+      if (this.line_num >= lines.length) break;
+      const line = lines[this.line_num];
+      if (line.is_blank) continue;
+      const indent = line.indent;
+      if (nextIndent === null) {
+        if (indent <= startIndent) throw this._err("invalid indent, expected at least one option");
+        nextIndent = indent;
+        this.indent = indent;
+      }
+      if (indent <= startIndent) { this.line_num -= 1; break; }
+      if (indent > this.indent) continue;
+      this.indent = indent;
+      const opt = this._parseOneOption(line, choiceEnds);
+      if (opt !== null) { options.push(opt); choiceEnds.push(opt.line); }
+    }
+    const end = this._choiceBlockLastLine(choiceLine, startIndent);
+    for (const ce of choiceEnds) this.temps._choice_ends.set(ce, end);
+    this.line_num = choiceLine;
+    return options;
+  };
+
+  E._choiceBlockLastLine = function (choiceLine, startIndent) {
+    const lines = this.scene.lines;
+    let last = choiceLine, i = choiceLine + 1;
+    while (i < lines.length) {
+      if (lines[i].is_blank) { i += 1; continue; }
+      if (lines[i].indent <= startIndent) break;
+      last = i; i += 1;
+    }
+    return last;
+  };
+
+  E._parseOneOption = function (line, choiceEnds) {
+    let reuse = this.temps.choice_reuse || "allow";
+    let unselectable = false;
+    let selectableReason = null;
+    let command = line.command ? line.command.toLowerCase() : null;
+    let text = line.text;
+
+    if (command) {
+      let rest = line.arg.trim();
+      while (command === "hide_reuse" || command === "disable_reuse" ||
+             command === "allow_reuse" || command === "random_weight") {
+        if (command === "hide_reuse") reuse = "hide";
+        else if (command === "disable_reuse") reuse = "disable";
+        else if (command === "allow_reuse") reuse = "allow";
+        else if (command === "random_weight") rest = this._stripParenthetical(rest);
+        const r = this._stripModifier(rest);
+        text = r[0]; command = r[1]; rest = r[2];
+      }
+      if (command === "if") {
+        choiceEnds.push(this.line_num);
+        const parsed = this._parseOptionIf(rest);
+        if (parsed === null) { this._cmd_if(rest, line); return null; }
+        if (!parsed.result) return null;
+        text = parsed.line; command = null;
+      } else if (command === "elseif" || command === "elsif" || command === "else") {
+        choiceEnds.push(this.line_num);
+        this._cmdIfChainInChoice(command, rest);
+        return null;
+      } else if (command === "selectable_if") {
+        const parsed = this._parseOptionIf(rest);
+        if (parsed === null) throw this._err("Couldn't parse *selectable_if: " + rest);
+        text = parsed.line;
+        if (!parsed.result) { unselectable = true; selectableReason = "requirement not met"; }
+      } else if (command === "print") {
+        text = "#" + csStr(this.evaluator.evalString(rest));
+      } else if (command === "comment") {
+        return null;
+      } else if (command) {
+        throw this._err("Expected an #option here, not *" + command);
+      }
+    }
+
+    if (reuse !== "allow") {
+      if (this.temps._choice_used.get(this.line_num)) {
+        if (reuse === "hide") return null;
+        unselectable = true; selectableReason = "already chosen";
+      }
+    }
+
+    text = text.trim();
+    if (!/^#\s*\S/.test(text)) throw this._err("Expected option starting with #: " + text);
+    const name = this.replace_variables(text.slice(1).trim());
+    const opt = { name: stripMarkup(name), line: this.line_num, selectable: !unselectable, reason: selectableReason };
+    if (reuse !== "allow") opt.reuse = reuse;
+    return opt;
+  };
+
+  E._cmdIfChainInChoice = function (command) {
+    if (command === "else") this._skipBranch(true);
+    else if (command === "elseif" || command === "elsif") this._skipBranch(true);
+  };
+
+  E._parseOptionIf = function (data) {
+    const m = /^\s*\(([\s\S]*)\)\s+(#[\s\S]*)/.exec(data);
+    if (!m) return null;
+    return { result: truthy(this.evaluator.evalString(m[1])), line: m[2] };
+  };
+
+  E._stripModifier = function (rest) {
+    rest = rest.trim();
+    const m = /^\*(\w+)([\s\S]*)/.exec(rest);
+    if (m) return [rest, m[1].toLowerCase(), m[2].trim()];
+    return [rest, null, rest];
+  };
+
+  E._stripParenthetical = function (rest) {
+    const openI = rest.indexOf("(");
+    if (openI === -1) return rest;
+    let depth = 0;
+    for (let i = openI; i < rest.length; i++) {
+      if (rest[i] === "(") depth += 1;
+      else if (rest[i] === ")") { depth -= 1; if (depth === 0) return rest.slice(i + 1).trim(); }
+    }
+    throw this._err("missing closing parenthesis");
+  };
+
+  // ---- dispatch table ---- //
+
+  const DISPATCH = {
+    create: E._cmd_create,
+    create_array: E._cmd_create_array,
+    temp: E._cmd_temp,
+    temp_array: E._cmd_temp_array,
+    set: E._cmd_set,
+    setref: E._cmd_setref,
+    config: E._cmd_set,
+    delete: E._cmd_delete,
+    delete_array: E._cmd_delete,
+    rand: E._cmd_rand,
+    goto: E._cmd_goto,
+    gotoref: E._cmd_gotoref,
+    label: E._cmd_label,
+    if: E._cmd_if,
+    else: E._cmd_else,
+    elseif: E._cmd_elseif,
+    elsif: E._cmd_elseif,
+    gosub: E._cmd_gosub,
+    return: E._cmd_return,
+    gosub_scene: E._cmd_gosub_scene,
+    goto_scene: E._cmd_goto_scene,
+    redirect_scene: E._cmd_goto_scene,
+    params: E._cmd_params,
+    finish: E._cmd_finish,
+    ending: E._cmd_ending,
+    delay_ending: E._cmd_delay_ending,
+    abort: E._cmd_abort,
+    restart: E._cmd_restart,
+    hide_reuse: E._cmd_hide_reuse,
+    disable_reuse: E._cmd_disable_reuse,
+    allow_reuse: E._cmd_allow_reuse,
+    save_game: E._cmd_save_game,
+    restore_game: E._cmd_restore_game,
+    save_checkpoint: E._cmd_save_checkpoint,
+    restore_checkpoint: E._cmd_restore_checkpoint,
+    print: E._cmd_print,
+    line_break: E._cmd_line_break,
+    page_break: E._cmd_page_break,
+    input_text: E._cmd_input_text,
+    input_number: E._cmd_input_number,
+    image: E._cmd_image,
+    text_image: E._cmd_image,
+    kindle_image: E._cmd_image,
+    achievement: E._cmd_achievement,
+    achieve: E._cmd_achieve,
+    bug: E._cmd_bug,
+    comment: E._cmd_comment,
+    scene_list: E._cmd_scene_list,
+    title: E._cmd_title,
+    author: E._cmd_author,
+    stat_chart: E._cmd_stat_chart,
+    choice: E._cmd_choice,
+    fake_choice: E._cmd_fake_choice,
+    arg0: E._cmd_arg0,
+  };
+
+  root.CS.Engine = Engine;
+
+  if (typeof module !== "undefined" && module.exports) module.exports = root.CS;
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+/* Browser save storage for the ChoiceScript web player.
+ *
+ * HTML+JS can't write files, so saves live in IndexedDB (one object store,
+ * keyed by an auto-increment id). Each record mirrors the Python save format:
+ * {game, description, saved_at, scene, state, is_autosave}. The autosave for a
+ * game is a single record (game + is_autosave=true), replaced in place.
+ *
+ * Exposed as a global `Saves` with promise-returning methods.
+ */
+(function (root) {
+  "use strict";
+
+  const DB_NAME = "choicescript";
+  const STORE = "saves";
+  let dbPromise = null;
+
+  function openDb() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          const store = db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+          store.createIndex("game", "game", { unique: false });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return dbPromise;
+  }
+
+  function tx(mode) {
+    return openDb().then((db) => db.transaction(STORE, mode).objectStore(STORE));
+  }
+
+  function reqPromise(request) {
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // List all saves for a game, newest first.
+  function list(game) {
+    return tx("readonly").then((store) => {
+      return new Promise((resolve, reject) => {
+        const out = [];
+        const idx = store.index("game");
+        const cursor = idx.openCursor(IDBKeyRange.only(game));
+        cursor.onsuccess = () => {
+          const c = cursor.result;
+          if (c) { out.push(c.value); c.continue(); }
+          else {
+            out.sort((a, b) => (b.saved_at || "").localeCompare(a.saved_at || ""));
+            resolve(out);
+          }
+        };
+        cursor.onerror = () => reject(cursor.error);
+      });
+    });
+  }
+
+  function nowIso() {
+    return new Date().toISOString().replace(/\.\d+Z$/, "").replace("T", "T");
+  }
+
+  // Write a named (manual) save. Never overwrites — always a new record.
+  // `rec` is the replay record: { seed, answers, description, saved_at, count }.
+  function putSave(game, rec) {
+    return tx("readwrite").then((store) =>
+      reqPromise(store.add({
+        game: game,
+        description: rec.description || "Save",
+        saved_at: rec.saved_at || nowIso(),
+        seed: rec.seed,
+        answers: rec.answers || [],
+        count: rec.count != null ? rec.count : (rec.answers || []).length,
+        is_autosave: false,
+      })));
+  }
+
+  // Write/replace the single autosave record for a game.
+  function putAutosave(game, rec) {
+    return tx("readwrite").then((store) => new Promise((resolve, reject) => {
+      const idx = store.index("game");
+      const cursor = idx.openCursor(IDBKeyRange.only(game));
+      let existing = null;
+      cursor.onsuccess = () => {
+        const c = cursor.result;
+        if (c) {
+          if (c.value.is_autosave) { existing = c.value; }
+          if (!existing) { c.continue(); return; }
+        }
+        const out = {
+          game: game, description: rec.description || "Autosave",
+          saved_at: rec.saved_at || nowIso(),
+          seed: rec.seed, answers: rec.answers || [],
+          count: rec.count != null ? rec.count : (rec.answers || []).length,
+          is_autosave: true,
+        };
+        if (existing) out.id = existing.id;
+        const put = store.put(out);
+        put.onsuccess = () => resolve(put.result);
+        put.onerror = () => reject(put.error);
+      };
+      cursor.onerror = () => reject(cursor.error);
+    }));
+  }
+
+  function getAutosave(game) {
+    return list(game).then((all) => all.find((s) => s.is_autosave) || null);
+  }
+
+  // All saves for a game, newest first (used to render the load list).
+  function listSaves(game) { return list(game); }
+
+  function deleteSave(game, id) {
+    return tx("readwrite").then((store) => reqPromise(store.delete(id)));
+  }
+
+  const idbBackend = { listSaves, putSave, putAutosave, getAutosave, deleteSave };
+
+  // ---- localStorage fallback ------------------------------------------- //
+  // IndexedDB is unavailable or throws in some contexts — notably Firefox on
+  // file:// origins, which is exactly how an offline compiled bundle is opened.
+  // This backend mirrors the same API over a single localStorage key so saves
+  // keep working there. One JSON array of records; ids are a simple counter.
+
+  function lsBackend() {
+    const KEY = "choicescript_saves";
+    function readAll() {
+      try { return JSON.parse(localStorage.getItem(KEY) || "[]"); }
+      catch (e) { return []; }
+    }
+    function writeAll(rows) { localStorage.setItem(KEY, JSON.stringify(rows)); }
+    function nextId(rows) {
+      return rows.reduce((m, r) => Math.max(m, r.id || 0), 0) + 1;
+    }
+    function forGame(rows, game) {
+      return rows.filter((r) => r.game === game)
+        .sort((a, b) => (b.saved_at || "").localeCompare(a.saved_at || ""));
+    }
+    return {
+      listSaves(game) { return Promise.resolve(forGame(readAll(), game)); },
+      putSave(game, rec) {
+        const rows = readAll();
+        rows.push({
+          id: nextId(rows), game: game,
+          description: rec.description || "Save", saved_at: rec.saved_at || nowIso(),
+          seed: rec.seed, answers: rec.answers || [],
+          count: rec.count != null ? rec.count : (rec.answers || []).length,
+          is_autosave: false,
+        });
+        writeAll(rows);
+        return Promise.resolve();
+      },
+      putAutosave(game, rec) {
+        const rows = readAll();
+        let row = rows.find((r) => r.game === game && r.is_autosave);
+        if (!row) { row = { id: nextId(rows), game: game, is_autosave: true }; rows.push(row); }
+        row.description = rec.description || "Autosave";
+        row.saved_at = rec.saved_at || nowIso();
+        row.seed = rec.seed;
+        row.answers = rec.answers || [];
+        row.count = rec.count != null ? rec.count : (rec.answers || []).length;
+        writeAll(rows);
+        return Promise.resolve();
+      },
+      getAutosave(game) {
+        return Promise.resolve(readAll().find((r) => r.game === game && r.is_autosave) || null);
+      },
+      deleteSave(game, id) {
+        writeAll(readAll().filter((r) => r.id !== id));
+        return Promise.resolve();
+      },
+    };
+  }
+
+  // Pick a backend: prefer IndexedDB, fall back to localStorage if it's missing
+  // or throws (e.g. file:// in Firefox). The probe is cheap and one-time.
+  function chooseBackend() {
+    try {
+      if (typeof indexedDB === "undefined" || indexedDB === null) return lsBackend();
+    } catch (e) { return lsBackend(); }
+    // Wrap each IDB method so a runtime failure transparently degrades to LS.
+    let fallback = null;
+    function wrap(name) {
+      return function () {
+        const args = arguments;
+        if (fallback) return fallback[name].apply(fallback, args);
+        let p;
+        try { p = idbBackend[name].apply(idbBackend, args); }
+        catch (e) { fallback = lsBackend(); return fallback[name].apply(fallback, args); }
+        return Promise.resolve(p).catch(() => {
+          fallback = lsBackend();
+          return fallback[name].apply(fallback, args);
+        });
+      };
+    }
+    return {
+      listSaves: wrap("listSaves"), putSave: wrap("putSave"),
+      putAutosave: wrap("putAutosave"), getAutosave: wrap("getAutosave"),
+      deleteSave: wrap("deleteSave"),
+    };
+  }
+
+  root.Saves = chooseBackend();
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+/* Browser front-end for the ChoiceScript web player.
+ *
+ * The engine (cs.js) is synchronous: io.choose() must return the chosen index
+ * immediately. Browsers can't block for a click, so we use a REPLAY model:
+ *   - a session is just {seed, answers[]}
+ *   - to show the current screen we build a fresh engine with a seeded RNG and
+ *     run it, feeding the recorded answers; the IO buffers all output and, when
+ *     the answers run out at a prompt, throws StopReplay carrying that prompt.
+ *   - the user's action appends one answer; we replay again.
+ * Deterministic (seeded rand) so replay always reproduces the same story, and
+ * saves are tiny (seed + answers). Stats use the same engine instance's
+ * read-only show_stats() overlay.
+ */
+(function () {
+  "use strict";
+
+  const CS = window.CS;
+
+  // Thrown by the replay IO when it needs the next answer.
+  class StopReplay extends Error {
+    constructor(prompt) { super("stop"); this.prompt = prompt; }
+  }
+
+  // Deterministic RNG (mulberry32) so a (seed, answers) pair reproduces a run.
+  function makeRng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // IO backend that feeds recorded answers and buffers output for one screen.
+  class ReplayIO {
+    constructor(answers) {
+      this.answers = answers;
+      this.cursor = 0;
+      this.output = [];        // {kind:'text'|'achievement'|'stat_chart', ...}
+      this.statsMode = false;  // when true, route text/stat_chart to statsOut
+      this.statsOut = [];
+      this.engine = null;
+      // Output index at which each new progress segment begins. A segment is
+      // the narration between two decisions; every consumed answer starts one.
+      this.segmentStarts = [];
+    }
+
+    _emit(item) { (this.statsMode ? this.statsOut : this.output).push(item); }
+
+    text(paragraph) { this._emit({ kind: "text", text: paragraph }); }
+    achievement(title) { this._emit({ kind: "achievement", title: title }); }
+    stat_chart(rows) { this._emit({ kind: "stat_chart", rows: rows }); }
+    image(info) { this._emit({ kind: "image", src: info.src, align: info.align, alt: info.alt }); }
+    colored_bar(info) { this._emit({ kind: "colored_bar", label: info.label, color: info.color, pct: info.pct, value: info.value }); }
+
+    _next(expectKind) {
+      if (this.cursor < this.answers.length) {
+        const a = this.answers[this.cursor];
+        this.cursor += 1;
+        // A decision was resolved: everything emitted from here on is a new
+        // progress segment (skip while replaying the stats overlay).
+        if (!this.statsMode) this.segmentStarts.push(this.output.length);
+        return a;
+      }
+      return undefined; // caller throws StopReplay
+    }
+
+    choose(options) {
+      const a = this._next();
+      if (a === undefined) throw new StopReplay({ kind: "choice", options: options });
+      // Record the picked option so it shows in the history log. _next() has
+      // already opened a new segment, so this lands at the top of it.
+      const opt = options[a.index];
+      if (!this.statsMode && opt) this._emit({ kind: "chosen", text: opt.name });
+      return a.index;
+    }
+    page_break(label) {
+      const a = this._next();
+      if (a === undefined) throw new StopReplay({ kind: "page", label: label });
+      // consumed; nothing to return
+    }
+    input_text(variable) {
+      const a = this._next();
+      if (a === undefined) throw new StopReplay({ kind: "input_text", variable: variable });
+      if (!this.statsMode) this._emit({ kind: "chosen", text: a.value });
+      return a.value;
+    }
+    input_number(variable, lo, hi) {
+      const a = this._next();
+      if (a === undefined) throw new StopReplay({ kind: "input_number", variable: variable, lo: lo, hi: hi });
+      if (!this.statsMode) this._emit({ kind: "chosen", text: String(a.value) });
+      return a.value;
+    }
+  }
+
+  // ---- scene loading ---- //
+
+  const sceneCache = {};   // "game/scene" -> parsed Line[]
+  let GAME = null;         // current game name
+  let sceneText = {};      // scene name -> raw text (fetched lazily)
+
+  // Thrown by the sync loader when a scene hasn't been fetched yet. The async
+  // controller catches it, fetches the file, and replays again (replay always
+  // re-runs from the start, so it converges once every needed scene is cached).
+  class NeedScene extends Error {
+    constructor(name) { super("need scene " + name); this.scene = name; }
+  }
+
+  async function fetchScene(name) {
+    // Offline bundle (compiled single-file build): scenes are embedded in the
+    // page, so read them from memory instead of hitting the network.
+    const off = window.__CS_OFFLINE__;
+    if (off && off.scenes) {
+      const key = name.toLowerCase();
+      if (key in off.scenes) return off.scenes[key];
+      throw new Error("could not load scene '" + name + "' (not in bundle)");
+    }
+    // Server mode: scenes are plain static files: <game>/scenes/<scene>.txt
+    const url = "/" + encodeURIComponent(GAME) + "/scenes/" +
+      encodeURIComponent(name) + ".txt";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("could not load scene '" + name + "' (" + res.status + ")");
+    return res.text();
+  }
+
+  function loaderFor() {
+    return function (name) {
+      name = name.toLowerCase();
+      const key = GAME + "/" + name;
+      if (!(key in sceneCache)) {
+        if (!(name in sceneText)) throw new NeedScene(name);
+        sceneCache[key] = CS.parseScene(sceneText[name]);
+      }
+      return sceneCache[key];
+    };
+  }
+
+  // ---- session (seed + answers) ---- //
+
+  let session = null;   // { seed, answers: [] }
+
+  function newSession() {
+    session = { seed: (Math.random() * 0x7fffffff) >>> 0, answers: [] };
+  }
+
+  // Replay the recorded answers and return {output, prompt} for the current
+  // screen, or {output, done:true} if the story ended. Async because a missing
+  // scene triggers a fetch and a fresh replay from the start.
+  async function replay() {
+    for (;;) {
+      const io = new ReplayIO(session.answers);
+      const engine = new CS.Engine(io, loaderFor());
+      engine._rng = makeRng(session.seed);
+      lastEngine = engine;
+      lastIO = io;
+      try {
+        engine.run("startup");
+        return { output: io.output, segmentStarts: io.segmentStarts, done: true };
+      } catch (e) {
+        if (e instanceof StopReplay) return { output: io.output, segmentStarts: io.segmentStarts, prompt: e.prompt };
+        if (e instanceof NeedScene) { await ensureScene(e.scene); continue; }
+        throw e;
+      }
+    }
+  }
+
+  async function ensureScene(name) {
+    name = name.toLowerCase();
+    if (name in sceneText) return;
+    sceneText[name] = await fetchScene(name);
+  }
+
+  let lastEngine = null;
+  let lastIO = null;
+
+  // ---- rendering ---- //
+
+  const $ = (sel) => document.querySelector(sel);
+  const storyEl = () => $("#story");
+  const promptEl = () => $("#prompt");
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function renderOutput(output, container) {
+    for (const item of output) {
+      if (item.kind === "text") {
+        container.appendChild(el("p", "para", item.text));
+      } else if (item.kind === "chosen") {
+        const row = el("p", "chosen");
+        row.appendChild(el("span", "chosen-mark", "➤ "));
+        row.appendChild(el("span", "chosen-text", item.text));
+        container.appendChild(row);
+      } else if (item.kind === "image") {
+        container.appendChild(renderImage(item));
+      } else if (item.kind === "achievement") {
+        container.appendChild(el("p", "achievement", "★ Achievement: " + item.title));
+      } else if (item.kind === "stat_chart") {
+        container.appendChild(renderStatChart(item.rows));
+      } else if (item.kind === "colored_bar") {
+        container.appendChild(coloredBar(item));
+      }
+    }
+  }
+
+  // Illustration from *image / *text_image. Source is relative to the game
+  // root (/<game>/<src>). If the file doesn't exist, the figure removes itself
+  // so a missing image just leaves the story unchanged.
+  function renderImage(item) {
+    const fig = el("figure", "story-image align-" + (item.align || "center"));
+    const img = document.createElement("img");
+    const parts = item.src.split("/").map(encodeURIComponent);
+    const off = window.__CS_OFFLINE__;
+    if (off) {
+      // Offline bundle: images sit in a local images/ folder beside index.html.
+      // Only the basename is used so nested source paths still resolve.
+      img.src = "images/" + parts[parts.length - 1];
+    } else {
+      img.src = "/" + encodeURIComponent(GAME) + "/" + parts.join("/");
+    }
+    img.alt = item.alt || "";
+    img.loading = "lazy";
+    img.onerror = () => { fig.remove(); };
+    fig.appendChild(img);
+    return fig;
+  }
+
+  function renderStatChart(rows) {
+    const box = el("div", "statchart");
+    for (const row of rows) {
+      if (row.kind === "text") {
+        box.appendChild(el("div", "stat-text", row.label + ": " + CS.csStr(row.value)));
+      } else if (row.kind === "percent") {
+        box.appendChild(bar(row.label, row.value));
+      } else if (row.kind === "opposed_pair") {
+        const l = (row.labels[0] || "?") + " vs " + (row.labels[1] || "?");
+        box.appendChild(bar(l, row.value));
+      }
+    }
+    return box;
+  }
+
+  function bar(label, value) {
+    let pct = Number(value);
+    if (isNaN(pct)) pct = 0;
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    const wrap = el("div", "stat-bar");
+    wrap.appendChild(el("span", "stat-label", label));
+    const track = el("span", "bar-track");
+    const fill = el("span", "bar-fill");
+    fill.style.width = pct + "%";
+    track.appendChild(fill);
+    wrap.appendChild(track);
+    wrap.appendChild(el("span", "stat-pct", pct + "%"));
+    return wrap;
+  }
+
+  // A magic-style meter from *gosub coloredbar: a colored fill whose width is
+  // the game's percentage, with the raw score shown at the end. The fill color
+  // comes straight from the game so each discipline keeps its own hue.
+  function coloredBar(item) {
+    let pct = Number(item.pct);
+    if (isNaN(pct)) pct = 0;
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    const wrap = el("div", "stat-bar colored-bar");
+    wrap.appendChild(el("span", "stat-label", item.label));
+    const track = el("span", "bar-track");
+    const fill = el("span", "bar-fill");
+    fill.style.width = pct + "%";
+    if (item.color) fill.style.background = item.color;
+    track.appendChild(fill);
+    wrap.appendChild(track);
+    wrap.appendChild(el("span", "stat-pct", CS.csStr(item.value)));
+    return wrap;
+  }
+
+  // ---- main render step ---- //
+
+  async function render() {
+    let result;
+    try {
+      result = await replay();
+    } catch (e) {
+      showError(e);
+      return;
+    }
+    const story = storyEl();
+    story.innerHTML = "";
+    const newestCard = renderSegments(result.output, result.segmentStarts, story);
+    const prompt = promptEl();
+    prompt.innerHTML = "";
+
+    if (result.done) {
+      prompt.appendChild(el("p", "ending", "— THE END —"));
+      const again = el("button", "btn", "Play again");
+      again.onclick = () => { newSession(); autosave(); render(); };
+      prompt.appendChild(again);
+      autosave();
+      refreshStats();
+      scrollNewest(newestCard);
+      return;
+    }
+
+    const p = result.prompt;
+    if (p.kind === "choice") renderChoice(p, prompt);
+    else if (p.kind === "page") renderPage(p, prompt);
+    else if (p.kind === "input_text") renderInputText(p, prompt);
+    else if (p.kind === "input_number") renderInputNumber(p, prompt);
+
+    autosave();
+    refreshStats();   // keep the live stats panel in sync with story progress
+    scrollNewest(newestCard);
+  }
+
+  // Put the START of the newest narration at the top of the viewport (just
+  // below the sticky topbar via scroll-padding-top), instead of jumping to the
+  // very bottom. That way long new passages begin at the top and can be read
+  // straight down without hunting for where the new text started.
+  function scrollNewest(card) {
+    if (card && card.scrollIntoView) card.scrollIntoView({ block: "start" });
+    else window.scrollTo(0, document.body.scrollHeight);
+  }
+
+  // Split the full output into bordered progress cards. Each segment is the
+  // narration produced after one decision; the first spans the story opening.
+  // Returns the last (newest) card so the caller can scroll it into view.
+  function renderSegments(output, segmentStarts, story) {
+    const bounds = [0].concat(segmentStarts || []);
+    let lastCard = null;
+    for (let s = 0; s < bounds.length; s++) {
+      const start = bounds[s];
+      const end = (s + 1 < bounds.length) ? bounds[s + 1] : output.length;
+      if (end <= start) continue;               // empty segment: skip the card
+      const card = el("div", "segment");
+      renderOutput(output.slice(start, end), card);
+      story.appendChild(card);
+      lastCard = card;
+    }
+    return lastCard;
+  }
+
+  function answer(a) { session.answers.push(a); render(); }  // render is async; fire-and-forget is fine
+
+  function renderChoice(p, prompt) {
+    const list = el("div", "choices");
+    p.options.forEach((opt, i) => {
+      const b = el("button", "btn choice", opt.name);
+      if (!opt.selectable) {
+        b.disabled = true;
+        b.title = opt.reason || "unavailable";
+        b.appendChild(el("span", "locked", "  (" + (opt.reason || "locked") + ")"));
+      } else {
+        b.onclick = () => answer({ index: i });
+      }
+      list.appendChild(b);
+    });
+    prompt.appendChild(list);
+  }
+
+  function renderPage(p, prompt) {
+    const b = el("button", "btn next", p.label || "Next");
+    b.onclick = () => answer({ page: true });
+    prompt.appendChild(b);
+  }
+
+  function renderInputText(p, prompt) {
+    const form = el("form", "inputform");
+    const input = el("input", "textinput");
+    input.type = "text";
+    input.placeholder = p.variable;
+    form.appendChild(input);
+    const b = el("button", "btn", "OK");
+    b.type = "submit";
+    form.appendChild(b);
+    form.onsubmit = (ev) => { ev.preventDefault(); answer({ value: input.value.trim() }); };
+    prompt.appendChild(form);
+    setTimeout(() => input.focus(), 0);
+  }
+
+  function renderInputNumber(p, prompt) {
+    const form = el("form", "inputform");
+    const input = el("input", "textinput");
+    input.type = "number";
+    input.min = p.lo; input.max = p.hi;
+    input.placeholder = p.lo + "–" + p.hi;
+    form.appendChild(input);
+    const b = el("button", "btn", "OK");
+    b.type = "submit";
+    form.appendChild(b);
+    form.onsubmit = (ev) => {
+      ev.preventDefault();
+      let v = Number(input.value);
+      if (isNaN(v) || v < p.lo || v > p.hi) { input.focus(); return; }
+      if (Number.isInteger(v)) {} else { v = v; }
+      answer({ value: v });
+    };
+    prompt.appendChild(form);
+    setTimeout(() => input.focus(), 0);
+  }
+
+  function showError(e) {
+    const prompt = promptEl();
+    prompt.innerHTML = "";
+    prompt.appendChild(el("p", "error", "Engine error: " + (e && e.message ? e.message : e)));
+    console.error(e);
+  }
+
+  // ---- live stats panel ---- //
+  //
+  // The stats screen (choicescript_stats) is often interactive — a *choice
+  // menu of stat categories the player clicks to expand. The panel keeps its
+  // own little replay session: `statsAnswers` records clicks made *inside* the
+  // panel, and we re-run the stats scene against a fresh snapshot of the
+  // current story state whenever the story advances (refreshStats) or the user
+  // navigates within stats. Because the snapshot is re-taken from live progress
+  // each time, the panel updates in realtime; browsing stats never advances the
+  // actual story.
+
+  let statsOpen = false;
+  let statsAnswers = [];       // clicks made inside the stats screen
+  let statsAvailable = null;   // null=unknown, true/false once probed
+
+  async function toggleStats() {
+    if (statsOpen) { closeStatsPanel(); return; }
+    if (statsAvailable === false) { flash("No stats screen for this game."); return; }
+    if (!(("choicescript_stats") in sceneText)) {
+      try { sceneText["choicescript_stats"] = await fetchScene("choicescript_stats"); statsAvailable = true; }
+      catch (e) { statsAvailable = false; flash("No stats screen for this game."); return; }
+    }
+    statsOpen = true;
+    statsAnswers = [];
+    document.body.classList.add("stats-open");
+    const panel = $("#stats-panel");
+    if (panel) panel.setAttribute("aria-hidden", "false");
+    await refreshStats();
+  }
+
+  function closeStatsPanel() {
+    statsOpen = false;
+    document.body.classList.remove("stats-open");
+    const panel = $("#stats-panel");
+    if (panel) panel.setAttribute("aria-hidden", "true");
+  }
+
+  // Re-render the stats panel against the current story state. No-op when the
+  // panel is closed. Called after every story step so stats stay live.
+  async function refreshStats() {
+    if (!statsOpen) return;
+    const body = $("#stats-body");
+    if (!body) return;
+
+    // Snapshot the story at the current point (fetching any missing scenes).
+    let state;
+    while (true) {
+      const io = new ReplayIO(session.answers);
+      const engine = new CS.Engine(io, loaderFor());
+      engine._rng = makeRng(session.seed);
+      try { engine.run("startup"); state = engine.captureState(); break; }
+      catch (e) {
+        if (e instanceof StopReplay) { state = engine.captureState(); break; }
+        if (e instanceof NeedScene) { await ensureScene(e.scene); continue; }
+        showStatsError(body, e); return;
+      }
+    }
+    await renderStatsScreen(state, body, true);
+  }
+
+  // Run choicescript_stats against `state` with `statsAnswers` replayed, then
+  // paint the result (and any interactive prompt) into `body`. If a recorded
+  // stats click is no longer valid against the current state (retry=true), we
+  // reset the stats navigation and re-render once from the top.
+  async function renderStatsScreen(state, body, retry) {
+    let io, prompt = null;
+    while (true) {
+      io = new ReplayIO(statsAnswers);
+      io.statsMode = true;
+      const engine = new CS.Engine(io, loaderFor());
+      engine._rng = makeRng(session.seed);
+      try {
+        engine._applyState(state);
+        engine.runStatsScene();
+        break;
+      } catch (e) {
+        if (e instanceof StopReplay) { prompt = e.prompt; break; }
+        if (e instanceof NeedScene) { await ensureScene(e.scene); continue; }
+        if (retry && statsAnswers.length) { statsAnswers = []; return renderStatsScreen(state, body, false); }
+        showStatsError(body, e); return;
+      }
+    }
+
+    body.innerHTML = "";
+    renderOutput(io.statsOut, body);
+    if (!prompt) return;
+
+    const rerun = (a) => { statsAnswers.push(a); refreshStats(); };
+    if (prompt.kind === "choice") {
+      const list = el("div", "choices");
+      prompt.options.forEach((opt, i) => {
+        const b = el("button", "btn choice", opt.name);
+        if (!opt.selectable) {
+          b.disabled = true;
+          b.title = opt.reason || "unavailable";
+          b.appendChild(el("span", "locked", "  (" + (opt.reason || "locked") + ")"));
+        } else {
+          b.onclick = () => rerun({ index: i });
+        }
+        list.appendChild(b);
+      });
+      body.appendChild(list);
+    } else if (prompt.kind === "page") {
+      const b = el("button", "btn next", prompt.label || "Next");
+      b.onclick = () => rerun({ page: true });
+      body.appendChild(b);
+    } else if (prompt.kind === "input_text") {
+      const form = el("form", "inputform");
+      const input = el("input", "textinput"); input.type = "text"; input.placeholder = prompt.variable;
+      form.appendChild(input);
+      const ok = el("button", "btn", "OK"); ok.type = "submit"; form.appendChild(ok);
+      form.onsubmit = (ev) => { ev.preventDefault(); rerun({ value: input.value.trim() }); };
+      body.appendChild(form);
+      setTimeout(() => input.focus(), 0);
+    } else if (prompt.kind === "input_number") {
+      const form = el("form", "inputform");
+      const input = el("input", "textinput"); input.type = "number"; input.min = prompt.lo; input.max = prompt.hi;
+      input.placeholder = prompt.lo + "–" + prompt.hi;
+      form.appendChild(input);
+      const ok = el("button", "btn", "OK"); ok.type = "submit"; form.appendChild(ok);
+      form.onsubmit = (ev) => {
+        ev.preventDefault();
+        const v = Number(input.value);
+        if (isNaN(v) || v < prompt.lo || v > prompt.hi) { input.focus(); return; }
+        rerun({ value: v });
+      };
+      body.appendChild(form);
+      setTimeout(() => input.focus(), 0);
+    }
+  }
+
+  function showStatsError(body, e) {
+    body.innerHTML = "";
+    body.appendChild(el("p", "error", "Stats error: " + (e && e.message ? e.message : e)));
+    console.error(e);
+  }
+
+  // ---- modal ---- //
+
+  function openModal(title, output) {
+    closeModal();
+    const overlay = el("div", "modal-overlay");
+    const modal = el("div", "modal");
+    const head = el("div", "modal-head");
+    head.appendChild(el("h2", null, title));
+    const x = el("button", "btn small", "Close");
+    x.onclick = closeModal;
+    head.appendChild(x);
+    modal.appendChild(head);
+    const body = el("div", "modal-body");
+    if (Array.isArray(output)) renderOutput(output, body);
+    else body.appendChild(output);
+    modal.appendChild(body);
+    overlay.appendChild(modal);
+    overlay.onclick = (ev) => { if (ev.target === overlay) closeModal(); };
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+  function closeModal() {
+    const ex = $(".modal-overlay");
+    if (ex) ex.remove();
+  }
+
+  // ---- save / load via IndexedDB ---- //
+
+  function autosave() {
+    if (!session) return;
+    Saves.putAutosave(GAME, { seed: session.seed, answers: session.answers,
+      saved_at: new Date().toISOString(), count: session.answers.length });
+  }
+
+  async function doSave() {
+    const desc = prompt("Name this save:", "Save " + new Date().toLocaleString());
+    if (desc === null) return;
+    await Saves.putSave(GAME, { seed: session.seed, answers: session.answers.slice(),
+      description: desc || "Save", saved_at: new Date().toISOString(), count: session.answers.length });
+    flash("Saved.");
+  }
+
+  async function doLoad() {
+    const list = await Saves.listSaves(GAME);
+    if (!list.length) { flash("No saves yet."); return; }
+    const box = el("div", "savelist");
+    list.forEach((s) => {
+      const row = el("div", "saverow");
+      const label = (s.is_autosave ? "[autosave] " : "") + (s.description || "Save") +
+        " — " + (s.count || 0) + " choices · " + fmtDate(s.saved_at);
+      const b = el("button", "btn", label);
+      b.onclick = () => {
+        session = { seed: s.seed, answers: s.answers.slice() };
+        closeModal(); autosave(); render();
+      };
+      row.appendChild(b);
+      if (!s.is_autosave) {
+        const del = el("button", "btn small danger", "✕");
+        del.onclick = async (ev) => { ev.stopPropagation(); await Saves.deleteSave(GAME, s.id); closeModal(); doLoad(); };
+        row.appendChild(del);
+      }
+      box.appendChild(row);
+    });
+    openModal("Load game", box);
+  }
+
+  function doRestart() {
+    if (!confirm("Restart from the beginning? Current progress is autosaved separately.")) return;
+    newSession(); autosave(); render();
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+  }
+
+  function flash(msg) {
+    const f = el("div", "flash", msg);
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), 1500);
+  }
+
+  // ---- boot ---- //
+
+  async function boot() {
+    const off = window.__CS_OFFLINE__;
+    if (off) {
+      GAME = off.game;
+    } else {
+      const params = new URLSearchParams(location.search);
+      GAME = params.get("game");
+      if (!GAME) { location.href = "/"; return; }
+    }
+    $("#game-title").textContent = off && off.title ? off.title : GAME;
+    document.title = (off && off.title ? off.title : GAME) + " — ChoiceScript";
+
+    const menuBtn = $("#btn-menu");
+    if (off) {
+      // Single-game offline bundle: no menu to return to.
+      if (menuBtn) menuBtn.style.display = "none";
+    } else if (menuBtn) {
+      menuBtn.onclick = () => { location.href = "index.html"; };
+    }
+    $("#btn-stats").onclick = toggleStats;
+    const closeBtn = $("#btn-stats-close");
+    if (closeBtn) closeBtn.onclick = closeStatsPanel;
+    $("#btn-save").onclick = doSave;
+    $("#btn-load").onclick = doLoad;
+    $("#btn-restart").onclick = doRestart;
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      if ($(".modal-overlay")) closeModal();
+      else if (statsOpen) closeStatsPanel();
+    });
+
+    // Resume from autosave if present, else start fresh.
+    const auto = await Saves.getAutosave(GAME);
+    if (auto && auto.answers) {
+      session = { seed: auto.seed, answers: auto.answers.slice() };
+    } else {
+      newSession();
+    }
+    render();
+  }
+
+  window.Player = { StopReplay, makeRng, ReplayIO };
+  document.addEventListener("DOMContentLoaded", boot);
+
+})();
+
+</script>
+</body>
+</html>
